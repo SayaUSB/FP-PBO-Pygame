@@ -1,5 +1,5 @@
 from .BaseEnemy import BaseEnemy
-from .Projectile import Projectile
+from ..Projectile import Projectile
 
 class RangedEnemy(BaseEnemy):
     def __init__(self, x, y, all_sprites, projectiles_group):

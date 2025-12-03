@@ -1,5 +1,5 @@
 from .BaseEnemy import BaseEnemy
-from .Player import Player
+from ..Player import Player
 
 class MeleeEnemy(BaseEnemy):
     def __init__(self, x: float, y: float):

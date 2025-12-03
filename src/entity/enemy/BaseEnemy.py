@@ -1,5 +1,5 @@
 import pygame
-from .Entity import Entity
+from ..Entity import Entity
 
 class BaseEnemy(Entity):
     def __init__(self, x, y, img_path, color):

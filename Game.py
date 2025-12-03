@@ -4,8 +4,8 @@ import pygame
 from src.Platform import Platform
 from src.entity.NPC import NPC
 from src.entity.Player import Player
-from src.entity.MeleeEnemy import MeleeEnemy
-from src.entity.RangedEnemy import RangedEnemy
+from src.entity.enemy.MeleeEnemy import MeleeEnemy
+from src.entity.enemy.RangedEnemy import RangedEnemy
 from src.DialogueManager import DialogueManager
 
 def load_config():
