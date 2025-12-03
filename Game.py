@@ -1,7 +1,7 @@
 import sys
 import json
 import pygame
-from src.Platform import Platform
+from src.map.Platform import Platform
 from src.entity.NPC import NPC
 from src.entity.Player import Player
 from src.entity.enemy.MeleeEnemy import MeleeEnemy
