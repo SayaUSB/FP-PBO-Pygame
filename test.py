@@ -4,13 +4,12 @@ import random
 import math
 import os 
 
-# Configuration
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-FPS = 60
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 1080
+FPS = 144
 GRAVITY = 0.8
+DT = 60 / FPS 
 
-# Color
 WHITE = (255, 255, 255)
 BLACK = (20, 20, 30)
 RED = (200, 50, 50)
@@ -23,6 +22,42 @@ DARK_GREEN = (50, 100, 50)
 GREY = (150, 150, 150)
 ORANGE = (255, 140, 0)
 PINK = (255, 105, 180)
+SEMI_TRANSPARENT_BLACK = (0, 0, 0, 180)
+
+class Explosion(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.radius = 10
+        self.max_radius = 150 
+        self.growth_rate = 15
+        self.pos_x = x
+        self.pos_y = y
+        
+        self.image = pygame.Surface((self.max_radius*2, self.max_radius*2), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.alpha = 255
+        self.timer = 20
+
+    def update(self):
+        self.timer -= 1 * DT
+        
+        if self.radius < self.max_radius:
+            self.radius += self.growth_rate * DT
+        
+        if self.timer < 10:
+            self.alpha -= 25 * DT
+            if self.alpha < 0: self.alpha = 0
+            
+        self.image.fill((0,0,0,0)) 
+        
+        pygame.draw.circle(self.image, (*ORANGE, int(self.alpha)), 
+                           (self.max_radius, self.max_radius), int(self.radius))
+        
+        pygame.draw.circle(self.image, (*YELLOW, int(self.alpha)), 
+                           (self.max_radius, self.max_radius), int(self.radius * 0.7))
+        
+        if self.timer <= 0:
+            self.kill()
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False, bullet_img=None):
@@ -38,15 +73,23 @@ class Bullet(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
         
-        speed = 10 if is_enemy else (20 if is_hmg else 15)
-        self.vel_x = dx * speed
-        self.vel_y = dy * speed
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        
+        self.speed = 10 if is_enemy else (20 if is_hmg else 15)
+        self.vel_x = dx * self.speed
+        self.vel_y = dy * self.speed
+        
         self.damage = damage
         self.is_enemy = is_enemy
 
     def update(self):
-        self.rect.x += self.vel_x
-        self.rect.y += self.vel_y
+        self.pos_x += self.vel_x * DT
+        self.pos_y += self.vel_y * DT
+        
+        self.rect.centerx = int(self.pos_x)
+        self.rect.centery = int(self.pos_y)
+        
         if self.rect.right < -100 or self.rect.left > 100000:
             self.kill()
         if self.rect.y > SCREEN_HEIGHT + 100 or self.rect.y < -100:
@@ -72,14 +115,14 @@ class Missile(pygame.sprite.Sprite):
         self.pos_y = float(y)
         
         self.timer = 0
-        self.tracking_limit = 60  
-        self.fuel_limit = 150  
+        self.tracking_limit = 60
+        self.fuel_limit = 150 
         
         self.vel_x = 0
         self.vel_y = 0
 
     def update(self):
-        self.timer += 1
+        self.timer += 1 * DT
         
         if self.timer < self.tracking_limit:
             dx = self.target.rect.centerx - self.rect.centerx
@@ -93,8 +136,8 @@ class Missile(pygame.sprite.Sprite):
             self.image = pygame.transform.rotate(self.original_image, -angle_deg)
             self.rect = self.image.get_rect(center=self.rect.center)
 
-        self.pos_x += self.vel_x
-        self.pos_y += self.vel_y
+        self.pos_x += self.vel_x * DT
+        self.pos_y += self.vel_y * DT
         
         self.rect.centerx = int(self.pos_x)
         self.rect.centery = int(self.pos_y)
@@ -108,21 +151,33 @@ class Missile(pygame.sprite.Sprite):
 class Grenade(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
-        self.image = pygame.Surface((12, 12))
+        self.image = pygame.Surface((16, 16))
         self.image.fill(ORANGE)
+        pygame.draw.rect(self.image, RED, (4,4,8,8)) 
+        
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        self.vel_x = direction * 9
-        self.vel_y = -11
-        self.timer = 50
+        
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        
+        self.vel_x = direction * 12 
+        self.vel_y = -14
+        self.timer = 60 
+        self.explode_now = False
 
     def update(self):
-        self.vel_y += GRAVITY
-        self.rect.x += self.vel_x
-        self.rect.y += self.vel_y
-        self.timer -= 1
+        self.vel_y += GRAVITY * DT
+        self.pos_x += self.vel_x * DT
+        self.pos_y += self.vel_y * DT
+        
+        self.rect.centerx = int(self.pos_x)
+        self.rect.centery = int(self.pos_y)
+        
+        self.timer -= 1 * DT
+        
         if self.timer <= 0:
-            self.kill()
+            self.explode_now = True
 
 class Item(pygame.sprite.Sprite):
     def __init__(self, x, y, color, type_name):
@@ -131,17 +186,23 @@ class Item(pygame.sprite.Sprite):
         self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
+        
+        self.pos_x = float(x)
+        self.pos_y = float(y)
         self.vel_y = -5
         self.type_name = type_name
 
     def update(self, platforms):
-        self.vel_y += GRAVITY
-        self.rect.y += self.vel_y
+        self.vel_y += GRAVITY * DT
+        self.pos_y += self.vel_y * DT
+        self.rect.centery = int(self.pos_y)
+        
         hits = pygame.sprite.spritecollide(self, platforms, False)
         for p in hits:
             if self.vel_y > 0:
                 self.rect.bottom = p.rect.top
                 self.vel_y = 0
+                self.pos_y = float(self.rect.centery)
 
 class HealthPack(Item):
     def __init__(self, x, y):
@@ -168,7 +229,7 @@ class MeleeEffect(pygame.sprite.Sprite):
         self.timer = 15 
 
     def update(self):
-        self.timer -= 1
+        self.timer -= 1 * DT
         if self.timer <= 0:
             self.kill()
 
@@ -179,6 +240,9 @@ class Player(pygame.sprite.Sprite):
         self.image.fill(BLUE)
         self.rect = self.image.get_rect()
         self.rect.topleft = (100, 100)
+        
+        self.pos_x = 100.0
+        self.pos_y = 100.0
         
         self.vel_y = 0
         self.speed = 5
@@ -196,6 +260,7 @@ class Player(pygame.sprite.Sprite):
         self.ammo = 0
         self.shoot_delay = 0
         
+        self.max_grenade_cd = 120
         self.grenade_cd = 0
         self.shield_regen_timer = 0
         
@@ -212,28 +277,32 @@ class Player(pygame.sprite.Sprite):
             self.is_shielding = False
             
         right_boundary = camera_x + SCREEN_WIDTH - 40 
+        
         if keys[pygame.K_LEFT]:
-            self.rect.x -= self.speed
+            self.pos_x -= self.speed * DT
             self.facing = -1
-            if self.rect.x < camera_x: self.rect.x = camera_x
+            if self.pos_x < camera_x: self.pos_x = camera_x
 
         if keys[pygame.K_RIGHT]:
-            self.rect.x += self.speed
+            self.pos_x += self.speed * DT
             self.facing = 1
-            if is_locked and self.rect.right > right_boundary: self.rect.right = right_boundary
+            if is_locked and self.pos_x + self.rect.width > right_boundary: 
+                self.pos_x = right_boundary - self.rect.width
+
+        self.rect.x = int(self.pos_x)
 
         if keys[pygame.K_SPACE] and self.on_ground:
             self.vel_y = self.jump_power
             self.on_ground = False
         
-        if keys[pygame.K_g] and self.grenade_cd == 0 and not self.is_shielding:
+        if keys[pygame.K_g] and self.grenade_cd <= 0 and not self.is_shielding:
             g = Grenade(self.rect.centerx, self.rect.centery, self.facing)
             all_sprites.add(g)
             grenades.add(g)
-            self.grenade_cd = 60
+            self.grenade_cd = self.max_grenade_cd 
 
         if keys[pygame.K_f] and self.weapon_type == "hmg" and not self.is_shielding:
-            if self.shoot_delay == 0:
+            if self.shoot_delay <= 0:
                 self.fire_bullet(bullets, all_sprites)
                 self.shoot_delay = 5
 
@@ -260,7 +329,7 @@ class Player(pygame.sprite.Sprite):
                 self.weapon_type = "pistol"
                 print("WEAPON: PISTOL")
 
-    def check_auto_melee(self, enemies, all_sprites, effects_group, spawn_loot_callback):
+    def check_auto_melee(self, enemies, all_sprites, effects_group, spawn_loot_callback, add_score_callback):
         if self.melee_cd > 0 or self.is_shielding:
             return
 
@@ -277,6 +346,7 @@ class Player(pygame.sprite.Sprite):
                 self.melee_cd = 40 
                 if e.hp <= 0:
                     spawn_loot_callback(e) 
+                    add_score_callback(e)
                     e.kill()
                 break 
 
@@ -292,8 +362,9 @@ class Player(pygame.sprite.Sprite):
             self.hp -= amount
 
     def update(self, platforms):
-        self.vel_y += GRAVITY
-        self.rect.y += self.vel_y
+        self.vel_y += GRAVITY * DT
+        self.pos_y += self.vel_y * DT
+        self.rect.y = int(self.pos_y)
         
         self.on_ground = False
         hits = pygame.sprite.spritecollide(self, platforms, False)
@@ -302,39 +373,49 @@ class Player(pygame.sprite.Sprite):
             if self.vel_y > 0 and self.rect.bottom < p.rect.bottom:
                 self.rect.bottom = p.rect.top
                 self.vel_y = 0
+                self.pos_y = float(self.rect.y)
                 self.on_ground = True
 
             elif self.vel_y < 0 and self.rect.top > p.rect.top:
                  self.rect.top = p.rect.bottom
                  self.vel_y = 0
+                 self.pos_y = float(self.rect.y)
+
+        self.rect.x = int(self.pos_x)
 
         if self.rect.y > SCREEN_HEIGHT + 200: self.hp = 0 
-        if self.grenade_cd > 0: self.grenade_cd -= 1
-        if self.shoot_delay > 0: self.shoot_delay -= 1
-        if self.melee_cd > 0: self.melee_cd -= 1
+        
+        if self.grenade_cd > 0: self.grenade_cd -= 1 * DT
+        if self.shoot_delay > 0: self.shoot_delay -= 1 * DT
+        if self.melee_cd > 0: self.melee_cd -= 1 * DT
         
         if self.is_shielding:
-            self.shield -= 0.3 
+            self.shield -= 0.3 * DT
             self.shield_regen_timer = 120
             if self.shield <= 0:
                 self.shield = 0
                 self.is_shielding = False
         else:
             if self.shield_regen_timer > 0:
-                self.shield_regen_timer -= 1
+                self.shield_regen_timer -= 1 * DT
             elif self.shield < self.max_shield:
-                self.shield += 0.5
+                self.shield += 0.5 * DT
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, hp, type_name):
+    def __init__(self, x, y, color, hp, type_name, score_val):
         super().__init__()
         self.image = pygame.Surface((40, 40))
         self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.bottomleft = (x, y)
+        
+        self.pos_x = float(x)
+        self.pos_y = float(self.rect.y)
+        
         self.hp = hp
         self.max_hp = hp
         self.type_name = type_name
+        self.score_val = score_val 
         self.shoot_timer = random.randint(0, 100)
 
     def check_bounds(self):
@@ -343,28 +424,38 @@ class Enemy(pygame.sprite.Sprite):
 
 class Soldier(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, RED, 30, 'soldier')
+        super().__init__(x, y, RED, 30, 'soldier', 100)
         self.vel_y = 0
         self.facing = -1
         self.speed = 2
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, bullet_img=None):
-        self.vel_y += GRAVITY
-        self.rect.y += self.vel_y
+        self.vel_y += GRAVITY * DT
+        self.pos_y += self.vel_y * DT
+        self.rect.y = int(self.pos_y)
+        
         hits = pygame.sprite.spritecollide(self, platforms, False)
         for p in hits:
             if self.vel_y > 0:
                 self.rect.bottom = p.rect.top
                 self.vel_y = 0
+                self.pos_y = float(self.rect.y)
         self.check_bounds()
 
         dist_x = player.rect.x - self.rect.x
-        if 5 < abs(dist_x) < 500:
-            if dist_x > 0: self.rect.x += self.speed; self.facing = 1
-            else: self.rect.x -= self.speed; self.facing = -1
         
-        self.shoot_timer += 1
-        if self.shoot_timer > 90 and abs(dist_x) < 400:
+        if 5 < abs(dist_x) < 1000:
+            if dist_x > 0: 
+                self.pos_x += self.speed * DT
+                self.facing = 1
+            else: 
+                self.pos_x -= self.speed * DT
+                self.facing = -1
+        
+        self.rect.x = int(self.pos_x)
+        self.shoot_timer += 1 * DT
+
+        if self.shoot_timer > 90 and abs(dist_x) < 800:
             if (self.facing == 1 and dist_x > 0) or (self.facing == -1 and dist_x < 0):
                 b = Bullet(self.rect.centerx, self.rect.centery, self.facing, 0, damage=10, is_enemy=True)
                 bullets.add(b)
@@ -373,33 +464,41 @@ class Soldier(Enemy):
 
 class Tank(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, DARK_GREEN, 120, 'tank')
+        super().__init__(x, y, DARK_GREEN, 120, 'tank', 500) 
         self.image = pygame.Surface((90, 60))
         self.image.fill(DARK_GREEN)
         self.rect = self.image.get_rect()
         self.rect.bottomleft = (x, y)
+        self.pos_x = float(x)
+        self.pos_y = float(self.rect.y)
+        
         self.vel_y = 0
         self.speed = 1
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, bullet_img=None):
-        self.vel_y += GRAVITY
-        self.rect.y += self.vel_y
+        self.vel_y += GRAVITY * DT
+        self.pos_y += self.vel_y * DT
+        self.rect.y = int(self.pos_y)
+        
         hits = pygame.sprite.spritecollide(self, platforms, False)
         for p in hits:
             if self.vel_y > 0:
                 self.rect.bottom = p.rect.top
                 self.vel_y = 0
+                self.pos_y = float(self.rect.y)
 
         self.check_bounds()
         dist_x = player.rect.x - self.rect.x
 
-        if 200 < abs(dist_x) < 700:
-            if dist_x > 0: self.rect.x += self.speed
-            else: self.rect.x -= self.speed
+        if 200 < abs(dist_x) < 1200:
+            if dist_x > 0: self.pos_x += self.speed * DT
+            else: self.pos_x -= self.speed * DT
+        
+        self.rect.x = int(self.pos_x)
 
-        self.shoot_timer += 1
+        self.shoot_timer += 1 * DT
 
-        if self.shoot_timer > 180 and abs(dist_x) < 700: 
+        if self.shoot_timer > 180 and abs(dist_x) < 1200: 
             m = Missile(self.rect.centerx, self.rect.centery - 20, player)
             all_sprites.add(m)
             missiles_group.add(m) 
@@ -407,19 +506,22 @@ class Tank(Enemy):
 
 class Helicopter(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, GREY, 60, 'heli')
+        super().__init__(x, y, GREY, 60, 'heli', 300)
         self.start_y = y
         self.phase = 0
+        self.pos_x = float(x)
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, bullet_img=None):
-        self.phase += 0.05
+        self.phase += 0.05 * DT
         self.rect.y = self.start_y + math.sin(self.phase) * 30
         
-        if self.rect.x < player.rect.x - 100: self.rect.x += 2
-        elif self.rect.x > player.rect.x + 100: self.rect.x -= 2
+        if self.rect.x < player.rect.x - 200: self.pos_x += 2 * DT
+        elif self.rect.x > player.rect.x + 200: self.pos_x -= 2 * DT
         
-        self.shoot_timer += 1
-        if self.shoot_timer > 70 and abs(player.rect.x - self.rect.x) < 500:
+        self.rect.x = int(self.pos_x)
+        
+        self.shoot_timer += 1 * DT
+        if self.shoot_timer > 70 and abs(player.rect.x - self.rect.x) < 1000:
             dx = player.rect.centerx - self.rect.centerx
             dy = player.rect.centery - self.rect.centery
             angle = math.atan2(dy, dx)
@@ -444,34 +546,47 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Metal Slug: Homing Missiles")
+        pygame.display.set_caption("Metal Slug: 1080p @ 240FPS")
         self.clock = pygame.time.Clock()
         self.running = True
         self.font = pygame.font.SysFont("Arial", 18)
         self.big_font = pygame.font.SysFont("Arial", 40, bold=True)
+        self.title_font = pygame.font.SysFont("Arial", 60, bold=True)
 
-        bullet_filename = 'bullet.png' 
-        
+        bullet_filename = 'assets/beras.png' 
         if os.path.exists(bullet_filename):
             try:
                 raw_image = pygame.image.load(bullet_filename).convert_alpha()
-                self.heli_bullet_img = pygame.transform.scale(raw_image, (25, 15))
+                self.heli_bullet_img = pygame.transform.scale(raw_image, (50, 50))
             except Exception as e:
-                self.heli_bullet_img = pygame.Surface((16, 16))
-                self.heli_bullet_img.fill((150, 150, 150))
-                pygame.draw.circle(self.heli_bullet_img, RED, (8,8), 6)
+                self.heli_bullet_img = None
         else:
-            self.heli_bullet_img = pygame.Surface((16, 16))
-            self.heli_bullet_img.fill((150, 150, 150))
-            pygame.draw.circle(self.heli_bullet_img, RED, (8,8), 6)
+            self.heli_bullet_img = None
 
+        self.highscore = self.load_high_score()
+        self.new_game()
+
+    def load_high_score(self):
+        filename = "highscore.txt"
+        if os.path.exists(filename):
+            try:
+                with open(filename, "r") as f:
+                    return int(f.read())
+            except:
+                return 0
+        return 0
+
+    def save_high_score(self):
+        filename = "highscore.txt"
+        with open(filename, "w") as f:
+            f.write(str(self.highscore))
+
+    def new_game(self):
         self.all_sprites = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
         self.bullets = pygame.sprite.Group()
         self.enemy_bullets = pygame.sprite.Group()
-        
         self.missiles = pygame.sprite.Group()
-        
         self.enemies = pygame.sprite.Group()
         self.grenades = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
@@ -486,6 +601,9 @@ class Game:
         
         self.battle_lock = False
         self.hmg_pickup_msg_timer = 0
+        
+        self.score = 0
+        self.game_state = "playing"
 
     def generate_chunk(self, start_x, width):
         ground_y = SCREEN_HEIGHT - 60
@@ -497,7 +615,7 @@ class Game:
         for i in range(num_obstacles):
             obs_w = random.randint(80, 180)
             obs_h = random.choice([40, 80, 110])
-            obs_x = start_x + random.randint(100, width - 100)
+            obs_x = start_x + random.randint(100, width - 400) 
             obs_y = ground_y - obs_h
             
             p = Platform(obs_x, obs_y, obs_w, obs_h)
@@ -532,10 +650,34 @@ class Game:
                 self.items.add(item)
                 self.all_sprites.add(item)
 
+    def add_score(self, enemy):
+        self.score += enemy.score_val
+
+    def trigger_explosion(self, grenade):
+        expl = Explosion(grenade.rect.centerx, grenade.rect.centery)
+        self.all_sprites.add(expl)
+        self.effects.add(expl)
+        EXPLOSION_RADIUS = 300
+        EXPLOSION_DAMAGE = 120 
+
+        for e in self.enemies:
+            dist = math.hypot(e.rect.centerx - grenade.rect.centerx, e.rect.centery - grenade.rect.centery)
+            
+            if dist < EXPLOSION_RADIUS:
+                e.hp -= EXPLOSION_DAMAGE
+                if e.hp <= 0:
+                    self.spawn_loot(e)
+                    self.add_score(e)
+                    e.kill()
+        grenade.kill()
+
     def update(self):
+        if self.game_state == "game_over":
+            return
+
         visible_enemies = [
             e for e in self.enemies 
-            if self.camera_x + 20 < e.rect.x < self.camera_x + SCREEN_WIDTH - 20
+            if self.camera_x - 200 < e.rect.x < self.camera_x + SCREEN_WIDTH + 200
         ]
         self.battle_lock = len(visible_enemies) > 0
 
@@ -543,13 +685,12 @@ class Game:
         if not self.battle_lock:
             self.camera_x += (target_cam - self.camera_x) * 0.1
 
-        if self.player.rect.right > self.world_limit - 400:
+        if self.player.rect.right > self.world_limit - SCREEN_WIDTH:
             self.generate_chunk(self.world_limit, 1200)
 
         self.player.get_input(self.all_sprites, self.bullets, self.grenades, self.battle_lock, self.camera_x)
         self.player.update(self.platforms)
-        
-        self.player.check_auto_melee(self.enemies, self.all_sprites, self.effects, self.spawn_loot)
+        self.player.check_auto_melee(self.enemies, self.all_sprites, self.effects, self.spawn_loot, self.add_score)
         
         self.bullets.update()
         self.grenades.update()
@@ -558,8 +699,17 @@ class Game:
         self.items.update(self.platforms)
         self.effects.update()
         
+        for g in self.grenades:
+            if g.explode_now:
+                self.trigger_explosion(g)
+
+        g_hits = pygame.sprite.groupcollide(self.enemies, self.grenades, False, False)
+        for e, g_list in g_hits.items():
+            for g in g_list:
+                self.trigger_explosion(g) 
+
         for e in self.enemies:
-            if -400 < e.rect.x - self.player.rect.x < 1500:
+            if -SCREEN_WIDTH < e.rect.x - self.player.rect.x < SCREEN_WIDTH * 1.5:
                 e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, 
                          missiles_group=self.missiles, bullet_img=self.heli_bullet_img)
 
@@ -569,17 +719,10 @@ class Game:
             e.hp -= dmg
             if e.hp <= 0: 
                 self.spawn_loot(e)
+                self.add_score(e)
                 e.kill()
         
         missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True)
-
-        g_hits = pygame.sprite.groupcollide(self.enemies, self.grenades, False, False)
-        for e, g_list in g_hits.items():
-            e.hp -= 40
-            for g in g_list: g.kill()
-            if e.hp <= 0: 
-                self.spawn_loot(e)
-                e.kill()
 
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         for bullet in player_hit_list:
@@ -599,21 +742,52 @@ class Game:
                 self.hmg_pickup_msg_timer = 60
 
         if self.player.hp <= 0:
-            print("GAME OVER")
-            self.running = False
+            self.game_state = "game_over"
+            if self.score > self.highscore:
+                self.highscore = self.score
+                self.save_high_score()
         
         if self.hmg_pickup_msg_timer > 0:
-            self.hmg_pickup_msg_timer -= 1
+            self.hmg_pickup_msg_timer -= 1 * DT
 
     def handle_input(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: self.running = False
+            
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_f and self.player.weapon_type == "pistol" and not self.player.is_shielding:
-                     self.player.fire_bullet(self.bullets, self.all_sprites)
+                if self.game_state == "playing":
+                    if event.key == pygame.K_f and self.player.weapon_type == "pistol" and not self.player.is_shielding:
+                        self.player.fire_bullet(self.bullets, self.all_sprites)
+                    if event.key == pygame.K_F1:
+                        for e in self.enemies: e.kill()
                 
-                if event.key == pygame.K_F1:
-                    for e in self.enemies: e.kill()
+                elif self.game_state == "game_over":
+                    if event.key == pygame.K_r:
+                        self.new_game()
+                    if event.key == pygame.K_ESCAPE:
+                        self.running = False
+
+    def draw_game_over_screen(self):
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill(SEMI_TRANSPARENT_BLACK)
+        self.screen.blit(overlay, (0,0))
+        
+        title_surf = self.title_font.render("GAME OVER", True, RED)
+        title_rect = title_surf.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 100))
+        self.screen.blit(title_surf, title_rect)
+        
+        score_surf = self.big_font.render(f"Score: {self.score}", True, WHITE)
+        score_rect = score_surf.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 20))
+        self.screen.blit(score_surf, score_rect)
+        
+        hs_color = GOLD if self.score >= self.highscore and self.score > 0 else GREY
+        hs_surf = self.font.render(f"Best Score: {self.highscore}", True, hs_color)
+        hs_rect = hs_surf.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20))
+        self.screen.blit(hs_surf, hs_rect)
+        
+        restart_surf = self.font.render("Press [R] to Restart  |  Press [ESC] to Exit", True, WHITE)
+        restart_rect = restart_surf.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80))
+        self.screen.blit(restart_surf, restart_rect)
 
     def draw(self):
         self.screen.fill(BLACK)
@@ -625,39 +799,59 @@ class Game:
                 if isinstance(s, Player) and s.is_shielding:
                     pygame.draw.circle(self.screen, CYAN, (off_x + 15, s.rect.y + 25), 40, 2)
         
-        hp_pct = max(0, self.player.hp / self.player.max_hp)
-        hp_col = (0, 255, 0) if hp_pct > 0.5 else (255, 0, 0)
-        pygame.draw.rect(self.screen, (50,0,0), (10, 10, 200, 20))
-        pygame.draw.rect(self.screen, hp_col, (10, 10, 200 * hp_pct, 20))
-        pygame.draw.rect(self.screen, WHITE, (10, 10, 200, 20), 2)
+        if self.game_state == "playing":
+            hp_pct = max(0, self.player.hp / self.player.max_hp)
+            hp_col = (0, 255, 0) if hp_pct > 0.5 else (255, 0, 0)
 
-        shield_pct = max(0, self.player.shield / self.player.max_shield)
-        shield_col = CYAN if self.player.shield > 0 else (50, 50, 50)
-        pygame.draw.rect(self.screen, (0,50,50), (10, 35, 150, 10))
-        pygame.draw.rect(self.screen, shield_col, (10, 35, 150 * shield_pct, 10))
-        pygame.draw.rect(self.screen, WHITE, (10, 35, 150, 10), 1)
-        
-        w_txt = "PISTOL"
-        w_col = WHITE
-        if self.player.weapon_type == "hmg":
-            w_txt = f"MACHINE GUN ({self.player.ammo})"
-            w_col = GOLD
-        
-        txt_weapon = self.font.render(w_txt, True, w_col)
-        self.screen.blit(txt_weapon, (10, 60))
-        
-        txt_info = self.font.render("F: Shoot (Hold for MG) | C: Shield | G: Grenade", True, GREY)
-        self.screen.blit(txt_info, (220, 10))
+            pygame.draw.rect(self.screen, (50,0,0), (10, 10, 200, 20))
+            pygame.draw.rect(self.screen, hp_col, (10, 10, 200 * hp_pct, 20))
+            pygame.draw.rect(self.screen, WHITE, (10, 10, 200, 20), 2)
 
-        if self.battle_lock:
-            warn = self.font.render("LOCKED!", True, RED)
-            self.screen.blit(warn, (SCREEN_WIDTH//2 - 40, 50))
-            barrier_screen_x = SCREEN_WIDTH - 40
-            pygame.draw.line(self.screen, RED, (barrier_screen_x, 0), (barrier_screen_x, SCREEN_HEIGHT), 2)
+            shield_pct = max(0, self.player.shield / self.player.max_shield)
+            shield_col = CYAN if self.player.shield > 0 else (50, 50, 50)
 
-        if self.hmg_pickup_msg_timer > 0:
-            msg = self.big_font.render("HEAVY MACHINE GUN!", True, GOLD)
-            self.screen.blit(msg, (SCREEN_WIDTH//2 - 200, SCREEN_HEIGHT//2 - 50))
+            pygame.draw.rect(self.screen, (0,50,50), (10, 35, 150, 10))
+            pygame.draw.rect(self.screen, shield_col, (10, 35, 150 * shield_pct, 10))
+            pygame.draw.rect(self.screen, WHITE, (10, 35, 150, 10), 1)
+
+            grenade_pct = 1.0 - (max(0, self.player.grenade_cd) / self.player.max_grenade_cd)
+            grenade_col = ORANGE if grenade_pct >= 1.0 else (100, 50, 0)
+            
+            pygame.draw.rect(self.screen, (50, 25, 0), (10, 50, 100, 8))
+            pygame.draw.rect(self.screen, grenade_col, (10, 50, 100 * grenade_pct, 8))
+            pygame.draw.rect(self.screen, WHITE, (10, 50, 100, 8), 1)
+
+            g_label = self.font.render("G", True, WHITE)
+            self.screen.blit(g_label, (115, 45))
+
+            
+            score_txt = self.font.render(f"SCORE: {self.score}", True, WHITE)
+            self.screen.blit(score_txt, (SCREEN_WIDTH - 150, 10))
+            
+            w_txt = "PISTOL"
+            w_col = WHITE
+            if self.player.weapon_type == "hmg":
+                w_txt = f"MACHINE GUN ({self.player.ammo})"
+                w_col = GOLD
+            
+            txt_weapon = self.font.render(w_txt, True, w_col)
+            self.screen.blit(txt_weapon, (10, 70))
+            
+            txt_info = self.font.render("F: Shoot (Hold for MG) | C: Shield | G: Grenade", True, GREY)
+            self.screen.blit(txt_info, (220, 10))
+
+            if self.battle_lock:
+                warn = self.font.render("LOCKED!", True, RED)
+                self.screen.blit(warn, (SCREEN_WIDTH//2 - 40, 50))
+                barrier_screen_x = SCREEN_WIDTH - 40
+                pygame.draw.line(self.screen, RED, (barrier_screen_x, 0), (barrier_screen_x, SCREEN_HEIGHT), 2)
+
+            if self.hmg_pickup_msg_timer > 0:
+                msg = self.big_font.render("HEAVY MACHINE GUN!", True, GOLD)
+                self.screen.blit(msg, (SCREEN_WIDTH//2 - 200, SCREEN_HEIGHT//2 - 50))
+
+        if self.game_state == "game_over":
+            self.draw_game_over_screen()
 
         pygame.display.flip()
 
