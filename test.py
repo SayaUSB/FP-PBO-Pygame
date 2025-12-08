@@ -4,13 +4,13 @@ import random
 import math
 import os 
 
-# --- Konfigurasi ---
+# Configuration
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 FPS = 60
 GRAVITY = 0.8
 
-# Warna
+# Color
 WHITE = (255, 255, 255)
 BLACK = (20, 20, 30)
 RED = (200, 50, 50)
@@ -23,8 +23,6 @@ DARK_GREEN = (50, 100, 50)
 GREY = (150, 150, 150)
 ORANGE = (255, 140, 0)
 PINK = (255, 105, 180)
-
-# --- Projectiles ---
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False, bullet_img=None):
@@ -73,8 +71,6 @@ class Grenade(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.kill()
 
-# --- Items & Effects ---
-
 class Item(pygame.sprite.Sprite):
     def __init__(self, x, y, color, type_name):
         super().__init__()
@@ -112,20 +108,16 @@ class MachineGunPickup(Item):
 class MeleeEffect(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        # Visual sabetan (lingkaran putih tipis)
         self.image = pygame.Surface((60, 60), pygame.SRCALPHA)
         pygame.draw.arc(self.image, (255, 255, 255), (0,0,60,60), 0, 3.14, 5)
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        self.timer = 15 # Muncul selama 15 frame (0.25 detik)
+        self.timer = 15 
 
     def update(self):
-        # Timer berkurang setiap frame
         self.timer -= 1
         if self.timer <= 0:
-            self.kill() # Menghapus diri sendiri dari semua grup
-
-# --- Actors ---
+            self.kill()
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -154,7 +146,6 @@ class Player(pygame.sprite.Sprite):
         self.grenade_cd = 0
         self.shield_regen_timer = 0
         
-        # Stats Melee
         self.melee_cd = 0     
         self.melee_range = 70 
         self.melee_dmg = 50   
@@ -172,6 +163,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.x -= self.speed
             self.facing = -1
             if self.rect.x < camera_x: self.rect.x = camera_x
+            
         if keys[pygame.K_RIGHT]:
             self.rect.x += self.speed
             self.facing = 1
@@ -215,7 +207,6 @@ class Player(pygame.sprite.Sprite):
                 self.weapon_type = "pistol"
                 print("WEAPON: PISTOL")
 
-    # --- PERBAIKAN: Menambah parameter 'effects_group' ---
     def check_auto_melee(self, enemies, all_sprites, effects_group, spawn_loot_callback):
         if self.melee_cd > 0 or self.is_shielding:
             return
@@ -225,26 +216,23 @@ class Player(pygame.sprite.Sprite):
             dist_y = abs(self.rect.centery - e.rect.centery)
 
             if dist_x < self.melee_range and dist_y < self.melee_range:
-                # Kena Hit!
                 e.hp -= self.melee_dmg
-                
-                # Visual
                 slash = MeleeEffect(e.rect.centerx, e.rect.centery)
-                all_sprites.add(slash)   # Masukkan ke grup gambar
-                effects_group.add(slash) # Masukkan ke grup update (PENTING AGAR HILANG)
-                
+                all_sprites.add(slash)   
+                effects_group.add(slash) 
                 self.melee_cd = 40 
-                
+
                 if e.hp <= 0:
                     spawn_loot_callback(e) 
-                    e.kill()
-                
-                break # Hanya hit 1 musuh per frame
+                    e.kill()              
+                break
 
     def take_damage(self, amount):
         self.shield_regen_timer = 180 
+
         if self.is_shielding:
             self.shield -= amount
+
             if self.shield < 0:
                 self.hp -= abs(self.shield)
                 self.shield = 0
@@ -258,20 +246,20 @@ class Player(pygame.sprite.Sprite):
         
         self.on_ground = False
         hits = pygame.sprite.spritecollide(self, platforms, False)
+
         for p in hits:
             if self.vel_y > 0 and self.rect.bottom < p.rect.bottom:
                 self.rect.bottom = p.rect.top
                 self.vel_y = 0
                 self.on_ground = True
+
             elif self.vel_y < 0 and self.rect.top > p.rect.top:
                  self.rect.top = p.rect.bottom
                  self.vel_y = 0
 
         if self.rect.y > SCREEN_HEIGHT + 200: self.hp = 0
-        
         if self.grenade_cd > 0: self.grenade_cd -= 1
         if self.shoot_delay > 0: self.shoot_delay -= 1
-        
         if self.melee_cd > 0: self.melee_cd -= 1
         
         if self.is_shielding:
@@ -409,9 +397,7 @@ class Game:
         self.running = True
         self.font = pygame.font.SysFont("Arial", 18)
         self.big_font = pygame.font.SysFont("Arial", 40, bold=True)
-
-        # Load Custom Bullet (Ganti dengan path gambar Anda)
-        bullet_filename = 'bullet.png' 
+        bullet_filename = 'assets/beras.png' 
         
         if os.path.exists(bullet_filename):
             try:
@@ -434,7 +420,6 @@ class Game:
         self.grenades = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
         
-        # --- PERBAIKAN: Membuat grup untuk effects ---
         self.effects = pygame.sprite.Group() 
 
         self.player = Player()
@@ -506,27 +491,21 @@ class Game:
         if self.player.rect.right > self.world_limit - 400:
             self.generate_chunk(self.world_limit, 1200)
 
-        # Update Player
         self.player.get_input(self.all_sprites, self.bullets, self.grenades, self.battle_lock, self.camera_x)
         self.player.update(self.platforms)
-        
-        # --- PERBAIKAN: Memasukkan self.effects ke parameter ---
         self.player.check_auto_melee(self.enemies, self.all_sprites, self.effects, self.spawn_loot)
         
-        # Update Groups
         self.bullets.update()
         self.grenades.update()
         self.enemy_bullets.update()
         self.items.update(self.platforms)
         
-        # --- PERBAIKAN: Update effects agar timer berjalan ---
         self.effects.update()
         
         for e in self.enemies:
             if -400 < e.rect.x - self.player.rect.x < 1500:
                 e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, bullet_img=self.heli_bullet_img)
 
-        # Collisions
         hits = pygame.sprite.groupcollide(self.enemies, self.bullets, False, True)
         for e, b_list in hits.items():
             dmg = sum([b.damage for b in b_list])
