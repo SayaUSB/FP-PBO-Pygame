@@ -2,6 +2,7 @@ import pygame
 import sys
 import random
 import math
+import os 
 
 # --- Konfigurasi ---
 SCREEN_WIDTH = 800
@@ -17,23 +18,25 @@ GREEN = (100, 100, 100)
 BLUE = (50, 100, 255)
 CYAN = (0, 255, 255)
 YELLOW = (255, 255, 0)
-GOLD = (255, 215, 0)         # Warna Machine Gun
+GOLD = (255, 215, 0)
 DARK_GREEN = (50, 100, 50)
 GREY = (150, 150, 150)
 ORANGE = (255, 140, 0)
 PINK = (255, 105, 180)
 
-# --- Classes: Projectiles ---
+# --- Projectiles ---
 
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False):
+    def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False, bullet_img=None):
         super().__init__()
-        # Visual peluru beda jika HMG
-        size = (14, 8) if is_hmg else (10, 8)
-        color = GOLD if is_hmg else (RED if is_enemy else YELLOW)
-        
-        self.image = pygame.Surface(size)
-        self.image.fill(color)
+        if bullet_img:
+            self.image = bullet_img
+        else:
+            size = (14, 8) if is_hmg else (10, 8)
+            color = GOLD if is_hmg else (RED if is_enemy else YELLOW)
+            self.image = pygame.Surface(size)
+            self.image.fill(color)
+            
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
         
@@ -70,7 +73,7 @@ class Grenade(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.kill()
 
-# --- Classes: Items (With Physics) ---
+# --- Items & Effects ---
 
 class Item(pygame.sprite.Sprite):
     def __init__(self, x, y, color, type_name):
@@ -79,14 +82,12 @@ class Item(pygame.sprite.Sprite):
         self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        self.vel_y = -5 # Pop up dikit pas drop
-        self.type_name = type_name # 'heal' atau 'mg'
+        self.vel_y = -5
+        self.type_name = type_name
 
     def update(self, platforms):
-        # Gravitasi Item (biar jatuh dari heli)
         self.vel_y += GRAVITY
         self.rect.y += self.vel_y
-        
         hits = pygame.sprite.spritecollide(self, platforms, False)
         for p in hits:
             if self.vel_y > 0:
@@ -96,7 +97,6 @@ class Item(pygame.sprite.Sprite):
 class HealthPack(Item):
     def __init__(self, x, y):
         super().__init__(x, y, PINK, 'heal')
-        # Visual H (Heal)
         pygame.draw.rect(self.image, WHITE, (8, 4, 9, 17))
         pygame.draw.rect(self.image, WHITE, (4, 8, 17, 9))
         pygame.draw.rect(self.image, RED, (10, 6, 5, 13))
@@ -105,12 +105,27 @@ class HealthPack(Item):
 class MachineGunPickup(Item):
     def __init__(self, x, y):
         super().__init__(x, y, GOLD, 'mg')
-        # Visual M (Machine Gun)
         font = pygame.font.SysFont("Arial", 20, bold=True)
         txt = font.render("M", True, BLACK)
         self.image.blit(txt, (5, 2))
 
-# --- Classes: Actors ---
+class MeleeEffect(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        # Visual sabetan (lingkaran putih tipis)
+        self.image = pygame.Surface((60, 60), pygame.SRCALPHA)
+        pygame.draw.arc(self.image, (255, 255, 255), (0,0,60,60), 0, 3.14, 5)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.timer = 15 # Muncul selama 15 frame (0.25 detik)
+
+    def update(self):
+        # Timer berkurang setiap frame
+        self.timer -= 1
+        if self.timer <= 0:
+            self.kill() # Menghapus diri sendiri dari semua grup
+
+# --- Actors ---
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -132,24 +147,26 @@ class Player(pygame.sprite.Sprite):
         self.shield = 100
         self.is_shielding = False
         
-        # WEAPON STATS
-        self.weapon_type = "pistol" # 'pistol' atau 'hmg'
+        self.weapon_type = "pistol"
         self.ammo = 0
-        self.shoot_delay = 0 # Untuk auto-fire
+        self.shoot_delay = 0
         
         self.grenade_cd = 0
         self.shield_regen_timer = 0
+        
+        # Stats Melee
+        self.melee_cd = 0     
+        self.melee_range = 70 
+        self.melee_dmg = 50   
 
     def get_input(self, all_sprites, bullets, grenades, is_locked, camera_x):
         keys = pygame.key.get_pressed()
         
-        # Shield Input
         if keys[pygame.K_c] and self.shield > 0:
             self.is_shielding = True
         else:
             self.is_shielding = False
             
-        # Movement
         right_boundary = camera_x + SCREEN_WIDTH - 40 
         if keys[pygame.K_LEFT]:
             self.rect.x -= self.speed
@@ -164,20 +181,17 @@ class Player(pygame.sprite.Sprite):
             self.vel_y = self.jump_power
             self.on_ground = False
         
-        # Grenade
         if keys[pygame.K_g] and self.grenade_cd == 0 and not self.is_shielding:
             g = Grenade(self.rect.centerx, self.rect.centery, self.facing)
             all_sprites.add(g)
             grenades.add(g)
             self.grenade_cd = 60
 
-        # AUTO FIRE INPUT (Hanya untuk Machine Gun)
         if keys[pygame.K_f] and self.weapon_type == "hmg" and not self.is_shielding:
             if self.shoot_delay == 0:
                 self.fire_bullet(bullets, all_sprites)
-                self.shoot_delay = 5 # Rate of fire cepat (5 frame)
+                self.shoot_delay = 5
 
-    # Fungsi nembak dipisah biar bisa dipanggil single (pistol) atau auto (hmg)
     def fire_bullet(self, bullets, all_sprites):
         keys = pygame.key.get_pressed()
         dx, dy = self.facing, 0
@@ -200,6 +214,32 @@ class Player(pygame.sprite.Sprite):
             if self.ammo <= 0:
                 self.weapon_type = "pistol"
                 print("WEAPON: PISTOL")
+
+    # --- PERBAIKAN: Menambah parameter 'effects_group' ---
+    def check_auto_melee(self, enemies, all_sprites, effects_group, spawn_loot_callback):
+        if self.melee_cd > 0 or self.is_shielding:
+            return
+
+        for e in enemies:
+            dist_x = abs(self.rect.centerx - e.rect.centerx)
+            dist_y = abs(self.rect.centery - e.rect.centery)
+
+            if dist_x < self.melee_range and dist_y < self.melee_range:
+                # Kena Hit!
+                e.hp -= self.melee_dmg
+                
+                # Visual
+                slash = MeleeEffect(e.rect.centerx, e.rect.centery)
+                all_sprites.add(slash)   # Masukkan ke grup gambar
+                effects_group.add(slash) # Masukkan ke grup update (PENTING AGAR HILANG)
+                
+                self.melee_cd = 40 
+                
+                if e.hp <= 0:
+                    spawn_loot_callback(e) 
+                    e.kill()
+                
+                break # Hanya hit 1 musuh per frame
 
     def take_damage(self, amount):
         self.shield_regen_timer = 180 
@@ -230,9 +270,10 @@ class Player(pygame.sprite.Sprite):
         if self.rect.y > SCREEN_HEIGHT + 200: self.hp = 0
         
         if self.grenade_cd > 0: self.grenade_cd -= 1
-        if self.shoot_delay > 0: self.shoot_delay -= 1 # Cooldown auto fire
+        if self.shoot_delay > 0: self.shoot_delay -= 1
         
-        # Shield Mechanics
+        if self.melee_cd > 0: self.melee_cd -= 1
+        
         if self.is_shielding:
             self.shield -= 0.3 
             self.shield_regen_timer = 120
@@ -254,7 +295,7 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.bottomleft = (x, y)
         self.hp = hp
         self.max_hp = hp
-        self.type_name = type_name # 'soldier', 'tank', 'heli'
+        self.type_name = type_name
         self.shoot_timer = random.randint(0, 100)
 
     def check_bounds(self):
@@ -268,7 +309,7 @@ class Soldier(Enemy):
         self.facing = -1
         self.speed = 2
 
-    def update(self, platforms, player, bullets, all_sprites):
+    def update(self, platforms, player, bullets, all_sprites, bullet_img=None):
         self.vel_y += GRAVITY
         self.rect.y += self.vel_y
         hits = pygame.sprite.spritecollide(self, platforms, False)
@@ -301,7 +342,7 @@ class Tank(Enemy):
         self.vel_y = 0
         self.speed = 1
 
-    def update(self, platforms, player, bullets, all_sprites):
+    def update(self, platforms, player, bullets, all_sprites, bullet_img=None):
         self.vel_y += GRAVITY
         self.rect.y += self.vel_y
         hits = pygame.sprite.spritecollide(self, platforms, False)
@@ -330,7 +371,7 @@ class Helicopter(Enemy):
         self.start_y = y
         self.phase = 0
 
-    def update(self, platforms, player, bullets, all_sprites):
+    def update(self, platforms, player, bullets, all_sprites, bullet_img=None):
         self.phase += 0.05
         self.rect.y = self.start_y + math.sin(self.phase) * 30
         
@@ -345,7 +386,7 @@ class Helicopter(Enemy):
             vel_x = math.cos(angle)
             vel_y = math.sin(angle)
             
-            b = Bullet(self.rect.centerx, self.rect.bottom, vel_x, vel_y, damage=20, is_enemy=True)
+            b = Bullet(self.rect.centerx, self.rect.bottom, vel_x, vel_y, damage=20, is_enemy=True, bullet_img=bullet_img)
             bullets.add(b)
             all_sprites.add(b)
             self.shoot_timer = 0
@@ -359,17 +400,31 @@ class Platform(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
 
-# --- Game Engine ---
-
 class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Metal Slug: Machine Gun Update")
+        pygame.display.set_caption("Metal Slug: Complete with Fixes")
         self.clock = pygame.time.Clock()
         self.running = True
         self.font = pygame.font.SysFont("Arial", 18)
         self.big_font = pygame.font.SysFont("Arial", 40, bold=True)
+
+        # Load Custom Bullet (Ganti dengan path gambar Anda)
+        bullet_filename = 'bullet.png' 
+        
+        if os.path.exists(bullet_filename):
+            try:
+                raw_image = pygame.image.load(bullet_filename).convert_alpha()
+                self.heli_bullet_img = pygame.transform.scale(raw_image, (25, 15))
+            except Exception as e:
+                self.heli_bullet_img = pygame.Surface((16, 16))
+                self.heli_bullet_img.fill((150, 150, 150))
+                pygame.draw.circle(self.heli_bullet_img, RED, (8,8), 6)
+        else:
+            self.heli_bullet_img = pygame.Surface((16, 16))
+            self.heli_bullet_img.fill((150, 150, 150))
+            pygame.draw.circle(self.heli_bullet_img, RED, (8,8), 6)
 
         self.all_sprites = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
@@ -378,6 +433,9 @@ class Game:
         self.enemies = pygame.sprite.Group()
         self.grenades = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
+        
+        # --- PERBAIKAN: Membuat grup untuk effects ---
+        self.effects = pygame.sprite.Group() 
 
         self.player = Player()
         self.all_sprites.add(self.player)
@@ -387,7 +445,7 @@ class Game:
         self.generate_chunk(0, 1000)
         
         self.battle_lock = False
-        self.hmg_pickup_msg_timer = 0 # Timer tulisan "HEAVY MACHINE GUN"
+        self.hmg_pickup_msg_timer = 0
 
     def generate_chunk(self, start_x, width):
         ground_y = SCREEN_HEIGHT - 60
@@ -423,14 +481,11 @@ class Game:
         self.world_limit = start_x + width
 
     def spawn_loot(self, enemy):
-        # 1. Logic Soldier: 10% Heal
         if enemy.type_name == 'soldier':
             if random.random() < 0.10:
                 item = HealthPack(enemy.rect.centerx, enemy.rect.centery)
                 self.items.add(item)
                 self.all_sprites.add(item)
-        
-        # 2. Logic Tank/Heli: 25% Machine Gun
         elif enemy.type_name in ['tank', 'heli']:
             if random.random() < 0.25:
                 item = MachineGunPickup(enemy.rect.centerx, enemy.rect.centery)
@@ -451,44 +506,47 @@ class Game:
         if self.player.rect.right > self.world_limit - 400:
             self.generate_chunk(self.world_limit, 1200)
 
+        # Update Player
         self.player.get_input(self.all_sprites, self.bullets, self.grenades, self.battle_lock, self.camera_x)
         self.player.update(self.platforms)
         
+        # --- PERBAIKAN: Memasukkan self.effects ke parameter ---
+        self.player.check_auto_melee(self.enemies, self.all_sprites, self.effects, self.spawn_loot)
+        
+        # Update Groups
         self.bullets.update()
         self.grenades.update()
         self.enemy_bullets.update()
-        self.items.update(self.platforms) # Update item agar jatuh
+        self.items.update(self.platforms)
+        
+        # --- PERBAIKAN: Update effects agar timer berjalan ---
+        self.effects.update()
         
         for e in self.enemies:
             if -400 < e.rect.x - self.player.rect.x < 1500:
-                e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites)
+                e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, bullet_img=self.heli_bullet_img)
 
-        # --- COLLISIONS ---
-        
-        # Player Bullet vs Enemy
+        # Collisions
         hits = pygame.sprite.groupcollide(self.enemies, self.bullets, False, True)
         for e, b_list in hits.items():
             dmg = sum([b.damage for b in b_list])
             e.hp -= dmg
             if e.hp <= 0: 
-                self.spawn_loot(e) # DROP ITEM SAAT MATI
+                self.spawn_loot(e)
                 e.kill()
 
-        # Grenade vs Enemy
         g_hits = pygame.sprite.groupcollide(self.enemies, self.grenades, False, False)
         for e, g_list in g_hits.items():
             e.hp -= 40
             for g in g_list: g.kill()
             if e.hp <= 0: 
-                self.spawn_loot(e) # DROP ITEM SAAT MATI
+                self.spawn_loot(e)
                 e.kill()
 
-        # Enemy Bullet vs Player
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         for bullet in player_hit_list:
             self.player.take_damage(bullet.damage)
 
-        # Player vs Items
         item_hits = pygame.sprite.spritecollide(self.player, self.items, True)
         for item in item_hits:
             if item.type_name == 'heal':
@@ -496,7 +554,7 @@ class Game:
             elif item.type_name == 'mg':
                 self.player.weapon_type = "hmg"
                 self.player.ammo = 100
-                self.hmg_pickup_msg_timer = 60 # Tampilkan teks 1 detik
+                self.hmg_pickup_msg_timer = 60
 
         if self.player.hp <= 0:
             print("GAME OVER")
@@ -509,7 +567,6 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT: self.running = False
             if event.type == pygame.KEYDOWN:
-                # F hanya untuk single fire (Pistol)
                 if event.key == pygame.K_f and self.player.weapon_type == "pistol" and not self.player.is_shielding:
                      self.player.fire_bullet(self.bullets, self.all_sprites)
                 
@@ -526,22 +583,18 @@ class Game:
                 if isinstance(s, Player) and s.is_shielding:
                     pygame.draw.circle(self.screen, CYAN, (off_x + 15, s.rect.y + 25), 40, 2)
         
-        # --- UI ---
-        # HP Bar
         hp_pct = max(0, self.player.hp / self.player.max_hp)
         hp_col = (0, 255, 0) if hp_pct > 0.5 else (255, 0, 0)
         pygame.draw.rect(self.screen, (50,0,0), (10, 10, 200, 20))
         pygame.draw.rect(self.screen, hp_col, (10, 10, 200 * hp_pct, 20))
         pygame.draw.rect(self.screen, WHITE, (10, 10, 200, 20), 2)
 
-        # Shield Bar
         shield_pct = max(0, self.player.shield / self.player.max_shield)
         shield_col = CYAN if self.player.shield > 0 else (50, 50, 50)
         pygame.draw.rect(self.screen, (0,50,50), (10, 35, 150, 10))
         pygame.draw.rect(self.screen, shield_col, (10, 35, 150 * shield_pct, 10))
         pygame.draw.rect(self.screen, WHITE, (10, 35, 150, 10), 1)
         
-        # Weapon Info
         w_txt = "PISTOL"
         w_col = WHITE
         if self.player.weapon_type == "hmg":
@@ -551,7 +604,6 @@ class Game:
         txt_weapon = self.font.render(w_txt, True, w_col)
         self.screen.blit(txt_weapon, (10, 60))
         
-        # Controls Info
         txt_info = self.font.render("F: Shoot (Hold for MG) | C: Shield | G: Grenade", True, GREY)
         self.screen.blit(txt_info, (220, 10))
 
@@ -561,7 +613,6 @@ class Game:
             barrier_screen_x = SCREEN_WIDTH - 40
             pygame.draw.line(self.screen, RED, (barrier_screen_x, 0), (barrier_screen_x, SCREEN_HEIGHT), 2)
 
-        # Pesan Pickup HMG
         if self.hmg_pickup_msg_timer > 0:
             msg = self.big_font.render("HEAVY MACHINE GUN!", True, GOLD)
             self.screen.blit(msg, (SCREEN_WIDTH//2 - 200, SCREEN_HEIGHT//2 - 50))
@@ -578,4 +629,4 @@ class Game:
         sys.exit()
 
 if __name__ == "__main__":
-    Game().run() 
+    Game().run()
