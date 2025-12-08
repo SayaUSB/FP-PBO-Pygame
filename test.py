@@ -52,6 +52,59 @@ class Bullet(pygame.sprite.Sprite):
         if self.rect.y > SCREEN_HEIGHT + 100 or self.rect.y < -100:
             self.kill()
 
+class Missile(pygame.sprite.Sprite):
+    def __init__(self, x, y, target):
+        super().__init__()
+        self.original_image = pygame.Surface((24, 12), pygame.SRCALPHA)
+        pygame.draw.polygon(self.original_image, CYAN, [(0,0), (24,6), (0,12)])
+        pygame.draw.circle(self.original_image, RED, (2, 6), 3) 
+        
+        self.image = self.original_image
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        
+        self.target = target
+        self.speed = 3.5    
+        self.damage = 40    
+        self.hp = 1
+        
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        
+        self.timer = 0
+        self.tracking_limit = 60  
+        self.fuel_limit = 150  
+        
+        self.vel_x = 0
+        self.vel_y = 0
+
+    def update(self):
+        self.timer += 1
+        
+        if self.timer < self.tracking_limit:
+            dx = self.target.rect.centerx - self.rect.centerx
+            dy = self.target.rect.centery - self.rect.centery
+            angle_rad = math.atan2(dy, dx)
+            angle_deg = math.degrees(angle_rad)
+            
+            self.vel_x = math.cos(angle_rad) * self.speed
+            self.vel_y = math.sin(angle_rad) * self.speed
+            
+            self.image = pygame.transform.rotate(self.original_image, -angle_deg)
+            self.rect = self.image.get_rect(center=self.rect.center)
+
+        self.pos_x += self.vel_x
+        self.pos_y += self.vel_y
+        
+        self.rect.centerx = int(self.pos_x)
+        self.rect.centery = int(self.pos_y)
+        
+        if self.timer >= self.fuel_limit:
+            self.kill() 
+
+        if self.rect.x < -200 or self.rect.x > 100000:
+            self.kill()
+
 class Grenade(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
@@ -218,21 +271,19 @@ class Player(pygame.sprite.Sprite):
             if dist_x < self.melee_range and dist_y < self.melee_range:
                 e.hp -= self.melee_dmg
                 slash = MeleeEffect(e.rect.centerx, e.rect.centery)
-                all_sprites.add(slash)   
-                effects_group.add(slash) 
+                all_sprites.add(slash)
+                effects_group.add(slash)
+                
                 self.melee_cd = 40 
-
                 if e.hp <= 0:
                     spawn_loot_callback(e) 
-                    e.kill()              
-                break
+                    e.kill()
+                break 
 
     def take_damage(self, amount):
         self.shield_regen_timer = 180 
-
         if self.is_shielding:
             self.shield -= amount
-
             if self.shield < 0:
                 self.hp -= abs(self.shield)
                 self.shield = 0
@@ -257,7 +308,7 @@ class Player(pygame.sprite.Sprite):
                  self.rect.top = p.rect.bottom
                  self.vel_y = 0
 
-        if self.rect.y > SCREEN_HEIGHT + 200: self.hp = 0
+        if self.rect.y > SCREEN_HEIGHT + 200: self.hp = 0 
         if self.grenade_cd > 0: self.grenade_cd -= 1
         if self.shoot_delay > 0: self.shoot_delay -= 1
         if self.melee_cd > 0: self.melee_cd -= 1
@@ -297,7 +348,7 @@ class Soldier(Enemy):
         self.facing = -1
         self.speed = 2
 
-    def update(self, platforms, player, bullets, all_sprites, bullet_img=None):
+    def update(self, platforms, player, bullets, all_sprites, missiles_group, bullet_img=None):
         self.vel_y += GRAVITY
         self.rect.y += self.vel_y
         hits = pygame.sprite.spritecollide(self, platforms, False)
@@ -330,7 +381,7 @@ class Tank(Enemy):
         self.vel_y = 0
         self.speed = 1
 
-    def update(self, platforms, player, bullets, all_sprites, bullet_img=None):
+    def update(self, platforms, player, bullets, all_sprites, missiles_group, bullet_img=None):
         self.vel_y += GRAVITY
         self.rect.y += self.vel_y
         hits = pygame.sprite.spritecollide(self, platforms, False)
@@ -338,19 +389,20 @@ class Tank(Enemy):
             if self.vel_y > 0:
                 self.rect.bottom = p.rect.top
                 self.vel_y = 0
-        self.check_bounds()
 
+        self.check_bounds()
         dist_x = player.rect.x - self.rect.x
+
         if 200 < abs(dist_x) < 700:
             if dist_x > 0: self.rect.x += self.speed
             else: self.rect.x -= self.speed
 
         self.shoot_timer += 1
-        if self.shoot_timer > 150 and abs(dist_x) < 700:
-            dx = 1 if dist_x > 0 else -1
-            b = Bullet(self.rect.centerx, self.rect.centery - 10, dx, 0, damage=35, is_enemy=True)
-            bullets.add(b)
-            all_sprites.add(b)
+
+        if self.shoot_timer > 180 and abs(dist_x) < 700: 
+            m = Missile(self.rect.centerx, self.rect.centery - 20, player)
+            all_sprites.add(m)
+            missiles_group.add(m) 
             self.shoot_timer = 0
 
 class Helicopter(Enemy):
@@ -359,7 +411,7 @@ class Helicopter(Enemy):
         self.start_y = y
         self.phase = 0
 
-    def update(self, platforms, player, bullets, all_sprites, bullet_img=None):
+    def update(self, platforms, player, bullets, all_sprites, missiles_group, bullet_img=None):
         self.phase += 0.05
         self.rect.y = self.start_y + math.sin(self.phase) * 30
         
@@ -392,17 +444,18 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Metal Slug: Complete with Fixes")
+        pygame.display.set_caption("Metal Slug: Homing Missiles")
         self.clock = pygame.time.Clock()
         self.running = True
         self.font = pygame.font.SysFont("Arial", 18)
         self.big_font = pygame.font.SysFont("Arial", 40, bold=True)
-        bullet_filename = 'assets/beras.png' 
+
+        bullet_filename = 'bullet.png' 
         
         if os.path.exists(bullet_filename):
             try:
                 raw_image = pygame.image.load(bullet_filename).convert_alpha()
-                self.heli_bullet_img = pygame.transform.scale(raw_image, (50, 50))
+                self.heli_bullet_img = pygame.transform.scale(raw_image, (25, 15))
             except Exception as e:
                 self.heli_bullet_img = pygame.Surface((16, 16))
                 self.heli_bullet_img.fill((150, 150, 150))
@@ -416,10 +469,12 @@ class Game:
         self.platforms = pygame.sprite.Group()
         self.bullets = pygame.sprite.Group()
         self.enemy_bullets = pygame.sprite.Group()
+        
+        self.missiles = pygame.sprite.Group()
+        
         self.enemies = pygame.sprite.Group()
         self.grenades = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
-        
         self.effects = pygame.sprite.Group() 
 
         self.player = Player()
@@ -467,7 +522,7 @@ class Game:
 
     def spawn_loot(self, enemy):
         if enemy.type_name == 'soldier':
-            if random.random() < 0.10:
+            if random.random() < 0.25:
                 item = HealthPack(enemy.rect.centerx, enemy.rect.centery)
                 self.items.add(item)
                 self.all_sprites.add(item)
@@ -493,18 +548,20 @@ class Game:
 
         self.player.get_input(self.all_sprites, self.bullets, self.grenades, self.battle_lock, self.camera_x)
         self.player.update(self.platforms)
+        
         self.player.check_auto_melee(self.enemies, self.all_sprites, self.effects, self.spawn_loot)
         
         self.bullets.update()
         self.grenades.update()
         self.enemy_bullets.update()
+        self.missiles.update() 
         self.items.update(self.platforms)
-        
         self.effects.update()
         
         for e in self.enemies:
             if -400 < e.rect.x - self.player.rect.x < 1500:
-                e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, bullet_img=self.heli_bullet_img)
+                e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, 
+                         missiles_group=self.missiles, bullet_img=self.heli_bullet_img)
 
         hits = pygame.sprite.groupcollide(self.enemies, self.bullets, False, True)
         for e, b_list in hits.items():
@@ -513,6 +570,8 @@ class Game:
             if e.hp <= 0: 
                 self.spawn_loot(e)
                 e.kill()
+        
+        missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True)
 
         g_hits = pygame.sprite.groupcollide(self.enemies, self.grenades, False, False)
         for e, g_list in g_hits.items():
@@ -525,6 +584,10 @@ class Game:
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         for bullet in player_hit_list:
             self.player.take_damage(bullet.damage)
+            
+        missile_hit_player = pygame.sprite.spritecollide(self.player, self.missiles, True)
+        for m in missile_hit_player:
+            self.player.take_damage(m.damage)
 
         item_hits = pygame.sprite.spritecollide(self.player, self.items, True)
         for item in item_hits:
