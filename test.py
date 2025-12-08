@@ -163,7 +163,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.x -= self.speed
             self.facing = -1
             if self.rect.x < camera_x: self.rect.x = camera_x
-            
+
         if keys[pygame.K_RIGHT]:
             self.rect.x += self.speed
             self.facing = 1
@@ -402,7 +402,7 @@ class Game:
         if os.path.exists(bullet_filename):
             try:
                 raw_image = pygame.image.load(bullet_filename).convert_alpha()
-                self.heli_bullet_img = pygame.transform.scale(raw_image, (25, 15))
+                self.heli_bullet_img = pygame.transform.scale(raw_image, (50, 50))
             except Exception as e:
                 self.heli_bullet_img = pygame.Surface((16, 16))
                 self.heli_bullet_img.fill((150, 150, 150))
