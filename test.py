@@ -27,6 +27,8 @@ PINK = (255, 105, 180)
 PURPLE = (128, 0, 128)
 SEMI_TRANSPARENT_BLACK = (0, 0, 0, 180)
 
+# --- VISUAL EFFECTS ---
+
 class Explosion(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -62,13 +64,15 @@ class Explosion(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.kill()
 
+# --- PROJECTILES ---
+
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False, bullet_img=None):
         super().__init__()
         if bullet_img:
             self.image = bullet_img
         else:
-            size = (14, 8) if is_hmg else (12, 12)
+            size = (14, 8) if is_hmg else (12, 12) 
             color = GOLD if is_hmg else (RED if is_enemy else YELLOW)
             self.image = pygame.Surface(size)
             self.image.fill(color)
@@ -166,7 +170,7 @@ class Grenade(pygame.sprite.Sprite):
         self.pos_y = float(y)
         
         self.vel_x = direction * (0 if is_enemy else 12) 
-        self.vel_y = 5 if is_enemy else -14 
+        self.vel_y = 5 if is_enemy else -14
         self.timer = 60 
         self.explode_now = False
         self.is_enemy = is_enemy
@@ -183,6 +187,8 @@ class Grenade(pygame.sprite.Sprite):
         
         if self.timer <= 0:
             self.explode_now = True
+
+# --- ITEMS ---
 
 class Item(pygame.sprite.Sprite):
     def __init__(self, x, y, color, type_name):
@@ -237,6 +243,8 @@ class MeleeEffect(pygame.sprite.Sprite):
         self.timer -= 1 * DT
         if self.timer <= 0:
             self.kill()
+
+# --- CHARACTERS ---
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -406,6 +414,8 @@ class Player(pygame.sprite.Sprite):
             elif self.shield < self.max_shield:
                 self.shield += 0.5 * DT
 
+# --- ENEMIES ---
+
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, color, hp, type_name, score_val):
         super().__init__()
@@ -538,6 +548,8 @@ class Helicopter(Enemy):
             all_sprites.add(b)
             self.shoot_timer = 0
 
+# --- BOSS ---
+
 class BossHelicopter(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, PURPLE, 5000, 'boss_heli', 10000)
@@ -553,13 +565,14 @@ class BossHelicopter(Enemy):
         
         self.start_y = y
         self.phase = 0
-        self.state = "move" # move, attack1, attack2, attack3
+        self.state = "move"
         self.state_timer = 0
         self.attack_cooldown = 0
         
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
         self.phase += 0.03 * DT
         hover_offset = math.sin(self.phase) * 50
+        
         self.state_timer += 1 * DT
         
         dist_x = player.rect.centerx - self.rect.centerx
@@ -579,7 +592,7 @@ class BossHelicopter(Enemy):
             attack_roll = random.choice(['mg', 'missile', 'bomb'])
             
             if attack_roll == 'mg':
-                for i in range(5): 
+                for i in range(5):
                     spread = random.uniform(-0.2, 0.2)
                     dx = player.rect.centerx - self.rect.centerx
                     dy = player.rect.centery - self.rect.centery
@@ -654,6 +667,7 @@ class Game:
             f.write(str(self.highscore))
 
     def new_game(self):
+        # Definisikan variabel boss sebelum generate chunk
         self.boss_fight_active = False
         self.next_boss_score = 10000
         
@@ -673,12 +687,12 @@ class Game:
         self.enemy_grenades = pygame.sprite.Group() 
         self.items = pygame.sprite.Group()
         self.effects = pygame.sprite.Group() 
+
         self.player = Player()
         self.all_sprites.add(self.player)
         
         self.camera_x = 0
         self.world_limit = 0
-
         self.generate_chunk(0, 1000)
 
     def generate_chunk(self, start_x, width):
@@ -802,7 +816,7 @@ class Game:
         self.player.get_input(self.all_sprites, self.bullets, self.grenades, self.battle_lock, self.camera_x)
         self.player.update(self.platforms)
         self.player.check_auto_melee(self.enemies, self.all_sprites, self.effects, self.spawn_loot, self.add_score)
-        self.player.check_auto_melee(self.boss_group, self.all_sprites, self.effects, self.spawn_loot, self.add_score) 
+        self.player.check_auto_melee(self.boss_group, self.all_sprites, self.effects, self.spawn_loot, self.add_score)
         
         self.bullets.update()
         self.grenades.update()
@@ -824,6 +838,14 @@ class Game:
         for b, g_list in g_boss_hits.items():
             for g in g_list: self.trigger_explosion(g)
 
+        ground_hits = pygame.sprite.groupcollide(self.grenades, self.platforms, False, False)
+        for g, plats in ground_hits.items():
+            g.explode_now = True
+
+        enemy_ground_hits = pygame.sprite.groupcollide(self.enemy_grenades, self.platforms, False, False)
+        for g, plats in enemy_ground_hits.items():
+            g.explode_now = True
+
         for g in self.enemy_grenades:
             if g.explode_now:
                 expl = Explosion(g.rect.centerx, g.rect.centery)
@@ -831,13 +853,13 @@ class Game:
                 self.effects.add(expl)
                 
                 dist_p = math.hypot(self.player.rect.centerx - g.rect.centerx, self.player.rect.centery - g.rect.centery)
-                if dist_p < 150:
+                if dist_p < 150: 
                     self.player.take_damage(30)
                 g.kill()
         
         bg_hits = pygame.sprite.spritecollide(self.player, self.enemy_grenades, False)
         for g in bg_hits:
-            g.explode_now = True
+            g.explode_now = True 
 
         for e in self.enemies:
             if -SCREEN_WIDTH < e.rect.x - self.player.rect.x < SCREEN_WIDTH * 1.5:
@@ -856,7 +878,7 @@ class Game:
                 self.spawn_loot(e)
                 self.add_score(e)
                 e.kill()
-
+        
         boss_hits = pygame.sprite.groupcollide(self.boss_group, self.bullets, False, True)
         for b, b_list in boss_hits.items():
             dmg = sum([b.damage for b in b_list])
@@ -868,7 +890,7 @@ class Game:
                 self.boss_fight_active = False
                 self.next_boss_score += 10000
         
-        missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True)
+        missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True) 
 
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         for bullet in player_hit_list:
