@@ -27,8 +27,6 @@ PINK = (255, 105, 180)
 PURPLE = (128, 0, 128)
 SEMI_TRANSPARENT_BLACK = (0, 0, 0, 180)
 
-# --- VISUAL EFFECTS ---
-
 class Explosion(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -64,10 +62,8 @@ class Explosion(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.kill()
 
-# --- PROJECTILES ---
-
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False, bullet_img=None):
+    def __init__(self, x, y, dx, dy, damage=10, is_enemy=False, is_hmg=False, bullet_img=None, miss_callback=None):
         super().__init__()
         if bullet_img:
             self.image = bullet_img
@@ -89,6 +85,7 @@ class Bullet(pygame.sprite.Sprite):
         
         self.damage = damage
         self.is_enemy = is_enemy
+        self.miss_callback = miss_callback 
 
     def update(self):
         self.pos_x += self.vel_x * DT
@@ -97,9 +94,15 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.centerx = int(self.pos_x)
         self.rect.centery = int(self.pos_y)
         
+        # Logic Bullet Miss
         if self.rect.right < -100 or self.rect.left > 100000:
+            if self.miss_callback and not self.is_enemy: 
+                self.miss_callback(5)
             self.kill()
+            
         if self.rect.y > SCREEN_HEIGHT + 100 or self.rect.y < -100:
+            if self.miss_callback and not self.is_enemy:
+                self.miss_callback(5)
             self.kill()
 
 class Missile(pygame.sprite.Sprite):
@@ -156,7 +159,7 @@ class Missile(pygame.sprite.Sprite):
             self.kill()
 
 class Grenade(pygame.sprite.Sprite):
-    def __init__(self, x, y, direction, is_enemy=False):
+    def __init__(self, x, y, direction, is_enemy=False, miss_callback=None):
         super().__init__()
         self.image = pygame.Surface((16, 16))
         color = RED if is_enemy else ORANGE
@@ -174,6 +177,7 @@ class Grenade(pygame.sprite.Sprite):
         self.timer = 60 
         self.explode_now = False
         self.is_enemy = is_enemy
+        self.miss_callback = miss_callback # Penalti grenade miss
 
     def update(self):
         self.vel_y += GRAVITY * DT
@@ -187,8 +191,12 @@ class Grenade(pygame.sprite.Sprite):
         
         if self.timer <= 0:
             self.explode_now = True
-
-# --- ITEMS ---
+            
+        # Jika jatuh ke jurang (miss)
+        if self.rect.y > SCREEN_HEIGHT + 200:
+            if self.miss_callback and not self.is_enemy:
+                self.miss_callback(200) # Penalti besar 200 poin
+            self.kill()
 
 class Item(pygame.sprite.Sprite):
     def __init__(self, x, y, color, type_name):
@@ -244,11 +252,10 @@ class MeleeEffect(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.kill()
 
-# --- CHARACTERS ---
-
 class Player(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, game_ref):
         super().__init__()
+        self.game_ref = game_ref
         self.image = pygame.Surface((30, 50))
         self.image.fill(BLUE)
         self.rect = self.image.get_rect()
@@ -309,7 +316,8 @@ class Player(pygame.sprite.Sprite):
             self.on_ground = False
         
         if keys[pygame.K_g] and self.grenade_cd <= 0 and not self.is_shielding:
-            g = Grenade(self.rect.centerx, self.rect.centery, self.facing)
+            # Pass callback penalty grenade miss
+            g = Grenade(self.rect.centerx, self.rect.centery, self.facing, miss_callback=self.game_ref.apply_miss_penalty)
             all_sprites.add(g)
             grenades.add(g)
             self.grenade_cd = self.max_grenade_cd 
@@ -332,7 +340,8 @@ class Player(pygame.sprite.Sprite):
         is_hmg = (self.weapon_type == "hmg")
         dmg = 25 if is_hmg else 20
         
-        b = Bullet(self.rect.centerx, self.rect.centery, dx, dy, damage=dmg, is_hmg=is_hmg)
+        # Pass callback penalty bullet miss
+        b = Bullet(self.rect.centerx, self.rect.centery, dx, dy, damage=dmg, is_hmg=is_hmg, miss_callback=self.game_ref.apply_miss_penalty)
         all_sprites.add(b)
         bullets.add(b)
 
@@ -357,9 +366,13 @@ class Player(pygame.sprite.Sprite):
                 effects_group.add(slash)
                 
                 self.melee_cd = 40 
+                
+                # Bonus: Melee Kill
+                add_score_callback(50) 
+                
                 if e.hp <= 0:
                     spawn_loot_callback(e) 
-                    add_score_callback(e)
+                    add_score_callback(e.score_val) # Kill Bonus
                     e.kill()
                 break 
 
@@ -373,6 +386,7 @@ class Player(pygame.sprite.Sprite):
                 self.is_shielding = False
         else:
             self.hp -= amount
+            self.game_ref.apply_damage_penalty(50) # Damage Penalty
 
     def update(self, platforms):
         self.vel_y += GRAVITY * DT
@@ -414,10 +428,8 @@ class Player(pygame.sprite.Sprite):
             elif self.shield < self.max_shield:
                 self.shield += 0.5 * DT
 
-# --- ENEMIES ---
-
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, hp, type_name, score_val):
+    def __init__(self, x, y, color, hp, type_name, score_val, hit_score):
         super().__init__()
         self.image = pygame.Surface((40, 40))
         self.image.fill(color)
@@ -430,7 +442,8 @@ class Enemy(pygame.sprite.Sprite):
         self.hp = hp
         self.max_hp = hp
         self.type_name = type_name
-        self.score_val = score_val 
+        self.score_val = score_val      
+        self.hit_score = hit_score      
         self.shoot_timer = random.randint(0, 100)
 
     def check_bounds(self):
@@ -439,7 +452,7 @@ class Enemy(pygame.sprite.Sprite):
 
 class Soldier(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, RED, 30, 'soldier', 100)
+        super().__init__(x, y, RED, 30, 'soldier', 100, 10)
         self.vel_y = 0
         self.facing = -1
         self.speed = 2
@@ -479,7 +492,7 @@ class Soldier(Enemy):
 
 class Tank(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, DARK_GREEN, 120, 'tank', 500) 
+        super().__init__(x, y, DARK_GREEN, 120, 'tank', 300, 30) 
         self.image = pygame.Surface((90, 60))
         self.image.fill(DARK_GREEN)
         self.rect = self.image.get_rect()
@@ -521,7 +534,7 @@ class Tank(Enemy):
 
 class Helicopter(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, GREY, 60, 'heli', 300)
+        super().__init__(x, y, GREY, 60, 'heli', 500, 50)
         self.start_y = y
         self.phase = 0
         self.pos_x = float(x)
@@ -548,11 +561,9 @@ class Helicopter(Enemy):
             all_sprites.add(b)
             self.shoot_timer = 0
 
-# --- BOSS ---
-
 class BossHelicopter(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, PURPLE, 5000, 'boss_heli', 10000)
+        super().__init__(x, y, PURPLE, 5000, 'boss_heli', 10000, 100)
         self.image = pygame.Surface((200, 100))
         self.image.fill(PURPLE)
         pygame.draw.rect(self.image, DARK_GREEN, (10, 10, 180, 80))
@@ -631,7 +642,7 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Metal Slug: Boss Fight Update")
+        pygame.display.set_caption("Metal Slug: Clone")
         self.clock = pygame.time.Clock()
         self.running = True
         self.font = pygame.font.SysFont("Arial", 18)
@@ -667,7 +678,6 @@ class Game:
             f.write(str(self.highscore))
 
     def new_game(self):
-        # Definisikan variabel boss sebelum generate chunk
         self.boss_fight_active = False
         self.next_boss_score = 10000
         
@@ -688,12 +698,24 @@ class Game:
         self.items = pygame.sprite.Group()
         self.effects = pygame.sprite.Group() 
 
-        self.player = Player()
+        self.player = Player(self) 
         self.all_sprites.add(self.player)
         
         self.camera_x = 0
         self.world_limit = 0
         self.generate_chunk(0, 1000)
+
+    def apply_miss_penalty(self, amount):
+        if self.game_state == "playing":
+            self.score -= amount
+
+    def apply_damage_penalty(self, amount):
+        if self.game_state == "playing":
+            self.score -= amount
+
+    def add_score(self, amount):
+        if self.game_state == "playing":
+            self.score += int(amount) 
 
     def generate_chunk(self, start_x, width):
         if self.boss_fight_active:
@@ -758,9 +780,6 @@ class Game:
                 self.items.add(item)
                 self.all_sprites.add(item)
 
-    def add_score(self, enemy):
-        self.score += enemy.score_val
-
     def trigger_explosion(self, grenade):
         expl = Explosion(grenade.rect.centerx, grenade.rect.centery)
         self.all_sprites.add(expl)
@@ -772,18 +791,20 @@ class Game:
             dist = math.hypot(e.rect.centerx - grenade.rect.centerx, e.rect.centery - grenade.rect.centery)
             if dist < EXPLOSION_RADIUS:
                 e.hp -= EXPLOSION_DAMAGE
+                self.add_score(e.hit_score) # Score per damage tick
                 if e.hp <= 0:
                     self.spawn_loot(e)
-                    self.add_score(e)
+                    self.add_score(e.score_val)
                     e.kill()
         
         for b in self.boss_group:
             dist = math.hypot(b.rect.centerx - grenade.rect.centerx, b.rect.centery - grenade.rect.centery)
             if dist < EXPLOSION_RADIUS:
                 b.hp -= EXPLOSION_DAMAGE
+                self.add_score(b.hit_score) # Score per damage tick
                 if b.hp <= 0:
                     self.spawn_loot(b)
-                    self.add_score(b)
+                    self.add_score(b.score_val)
                     b.kill()
                     self.boss_fight_active = False 
                     self.next_boss_score += 10000
@@ -870,22 +891,28 @@ class Game:
             b.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, 
                      missiles_group=self.missiles, grenades_group=self.enemy_grenades)
 
+        # Player vs Enemy
         hits = pygame.sprite.groupcollide(self.enemies, self.bullets, False, True)
         for e, b_list in hits.items():
-            dmg = sum([b.damage for b in b_list])
-            e.hp -= dmg
+            for b in b_list:
+                e.hp -= b.damage
+                self.add_score(e.hit_score) # Score per Hit
+            
             if e.hp <= 0: 
                 self.spawn_loot(e)
-                self.add_score(e)
+                self.add_score(e.score_val)
                 e.kill()
         
+        # Player vs Boss
         boss_hits = pygame.sprite.groupcollide(self.boss_group, self.bullets, False, True)
         for b, b_list in boss_hits.items():
-            dmg = sum([b.damage for b in b_list])
-            b.hp -= dmg
+            for b in b_list:
+                b.hp -= b.damage
+                self.add_score(b.hit_score) # Score per Hit
+            
             if b.hp <= 0:
                 self.spawn_loot(b)
-                self.add_score(b)
+                self.add_score(b.score_val)
                 b.kill()
                 self.boss_fight_active = False
                 self.next_boss_score += 10000
