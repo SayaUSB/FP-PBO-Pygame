@@ -755,16 +755,16 @@ class Game:
                 e = Soldier(obs_x + obs_w//2, obs_y - 10)
                 self.enemies.add(e)
                 self.all_sprites.add(e)
-            elif roll < 0.6:
+            elif roll < 0.8:
                 h = Helicopter(obs_x, 150)
                 self.enemies.add(h)
                 self.all_sprites.add(h)
-            elif roll < 0.8:
+            elif roll < 0.6:
                 t = Tank(obs_x + 200, ground_y - 10)
                 self.enemies.add(t)
                 self.all_sprites.add(t)
         self.world_limit = start_x + width
-        
+
     def spawn_loot(self, enemy):
         if enemy.type_name == 'boss_heli':
             for _ in range(3):
