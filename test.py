@@ -269,7 +269,7 @@ class Player(pygame.sprite.Sprite):
         self.facing = 1
         self.on_ground = False
         
-        self.max_hp = 100
+        self.max_hp = 200
         self.hp = 100
         self.max_shield = 100
         self.shield = 100
@@ -688,6 +688,8 @@ class Game:
         self.game_state = "playing"
         self.battle_lock = False
         self.hmg_pickup_msg_timer = 0
+
+        self.boss_cooldown = 0 
         
         self.max_distance = 100.0 
         self.distance_accumulator = 0.0
@@ -761,7 +763,6 @@ class Game:
                 h = Helicopter(obs_x, 150)
                 self.enemies.add(h)
                 self.all_sprites.add(h)
-
         self.world_limit = start_x + width
 
     def spawn_loot(self, enemy):
@@ -814,6 +815,7 @@ class Game:
                     b.kill()
                     self.boss_fight_active = False 
                     self.next_boss_score += 10000
+                    self.boss_cooldown = 10**6
 
         grenade.kill()
 
@@ -828,13 +830,14 @@ class Game:
             self.distance_accumulator += diff
             
             if self.distance_accumulator >= 20.0:
-                points = int(self.distance_accumulator / 20.0) # 1 Poin every 20 pixels
+                points = int(self.distance_accumulator / 20.0)
                 self.score += points
-                self.distance_accumulator -= (points * 20.0) # Store decimal number
+                self.distance_accumulator -= (points * 20.0)
             
             self.max_distance = float(current_x)
         
-        if self.score >= self.next_boss_score and not self.boss_fight_active:
+        # Logic : Spawn boss & Cooldown
+        if self.score >= self.next_boss_score and not self.boss_fight_active and self.boss_cooldown <= 0:
             self.boss_fight_active = True
             boss_spawn_x = self.camera_x + SCREEN_WIDTH - 200
             boss = BossHelicopter(boss_spawn_x, 200)
@@ -931,9 +934,10 @@ class Game:
             if boss_enemy.hp <= 0:
                 self.spawn_loot(boss_enemy)
                 self.add_score(boss_enemy.score_val)
-                boss_enemy.kill()
+                boss_enemy.kill()                
                 self.boss_fight_active = False
                 self.next_boss_score += 10000
+                self.boss_cooldown = 10**6
         
         missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True) 
 
@@ -948,7 +952,7 @@ class Game:
         item_hits = pygame.sprite.spritecollide(self.player, self.items, True)
         for item in item_hits:
             self.add_score(100)
-
+            
             if item.type_name == 'heal':
                 self.player.hp = min(self.player.max_hp, self.player.hp + 30)
             elif item.type_name == 'mg':
@@ -964,6 +968,9 @@ class Game:
         
         if self.hmg_pickup_msg_timer > 0:
             self.hmg_pickup_msg_timer -= 1 * DT
+            
+        if self.boss_cooldown > 0:
+            self.boss_cooldown -= 1 * DT
 
     def handle_input(self):
         for event in pygame.event.get():
