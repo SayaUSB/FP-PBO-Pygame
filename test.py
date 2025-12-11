@@ -177,7 +177,7 @@ class Grenade(pygame.sprite.Sprite):
         self.timer = 60 
         self.explode_now = False
         self.is_enemy = is_enemy
-        self.miss_callback = miss_callback # Penalti grenade miss
+        self.miss_callback = miss_callback # Grenade penalty miss
 
     def update(self):
         self.vel_y += GRAVITY * DT
@@ -192,10 +192,9 @@ class Grenade(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.explode_now = True
             
-        # Jika jatuh ke jurang (miss)
         if self.rect.y > SCREEN_HEIGHT + 200:
             if self.miss_callback and not self.is_enemy:
-                self.miss_callback(200) # Penalti besar 200 poin
+                self.miss_callback(20) 
             self.kill()
 
 class Item(pygame.sprite.Sprite):
@@ -496,7 +495,7 @@ class Soldier(Enemy):
 
 class Tank(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, DARK_GREEN, 120, 'tank', 500, 30) 
+        super().__init__(x, y, DARK_GREEN, 120, 'tank', 300, 30) 
         self.image = pygame.Surface((90, 60))
         self.image.fill(DARK_GREEN)
         self.rect = self.image.get_rect()
@@ -538,7 +537,7 @@ class Tank(Enemy):
 
 class Helicopter(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, GREY, 60, 'heli', 300, 30)
+        super().__init__(x, y, GREY, 60, 'heli', 500, 50)
         self.start_y = y
         self.phase = 0
         self.pos_x = float(x)
@@ -690,8 +689,7 @@ class Game:
         self.battle_lock = False
         self.hmg_pickup_msg_timer = 0
         
-        # Distance score
-        self.max_distance = 100.0 # Starting position player
+        self.max_distance = 100.0 
         self.distance_accumulator = 0.0
 
         self.all_sprites = pygame.sprite.Group()
@@ -755,14 +753,15 @@ class Game:
                 e = Soldier(obs_x + obs_w//2, obs_y - 10)
                 self.enemies.add(e)
                 self.all_sprites.add(e)
-            elif roll < 0.8:
-                h = Helicopter(obs_x, 150)
-                self.enemies.add(h)
-                self.all_sprites.add(h)
             elif roll < 0.6:
                 t = Tank(obs_x + 200, ground_y - 10)
                 self.enemies.add(t)
                 self.all_sprites.add(t)
+            elif roll < 0.8:
+                h = Helicopter(obs_x, 150)
+                self.enemies.add(h)
+                self.all_sprites.add(h)
+
         self.world_limit = start_x + width
 
     def spawn_loot(self, enemy):
@@ -822,7 +821,6 @@ class Game:
         if self.game_state == "game_over":
             return
         
-        # Distance scoring
         current_x = self.player.rect.centerx
         
         if current_x > self.max_distance:
@@ -923,7 +921,7 @@ class Game:
                 self.add_score(e.score_val)
                 e.kill()
         
-        # Player vs Bos
+        # Player vs Boss
         boss_hits = pygame.sprite.groupcollide(self.boss_group, self.bullets, False, True)
         for boss_enemy, bullet_list in boss_hits.items():
             for bullet in bullet_list:
@@ -949,6 +947,8 @@ class Game:
 
         item_hits = pygame.sprite.spritecollide(self.player, self.items, True)
         for item in item_hits:
+            self.add_score(100)
+
             if item.type_name == 'heal':
                 self.player.hp = min(self.player.max_hp, self.player.hp + 30)
             elif item.type_name == 'mg':
