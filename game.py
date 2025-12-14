@@ -360,25 +360,47 @@ class Game:
                         self.running = False
 
     def draw_tree(self, x, y, size=1.0):
+        """Draw a simple tree silhouette.
+
+        x,y are screen-space coordinates for the tree base (touching the ground).
+        """
         # Trunk
-        trunk_height = int(40 * size)
-        trunk_width = int(15 * size)
-        pygame.draw.rect(self.screen, TREE_BROWN, (x - trunk_width//2, y - trunk_height, trunk_width, trunk_height))
+        trunk_h = int(55 * size)
+        trunk_w = max(8, int(18 * size))
+        trunk_rect = pygame.Rect(x - trunk_w // 2, y - trunk_h, trunk_w, trunk_h)
+        pygame.draw.rect(self.screen, TREE_BROWN, trunk_rect, border_radius=max(1, int(3 * size)))
 
-        # Leaves (triangle)
-        leaves_height = int(60 * size)
-        leaves_width = int(80 * size)
-        leaves_points = [
-            (x, y - trunk_height),  # Top center
-            (x - leaves_width//2, y - trunk_height + leaves_height),  # Bottom left
-            (x + leaves_width//2, y - trunk_height + leaves_height)   # Bottom right
-        ]
-        pygame.draw.polygon(self.screen, TREE_GREEN, leaves_points)
+        # Small shadow on trunk for depth
+        shadow_col = (max(0, TREE_BROWN[0] - 25), max(0, TREE_BROWN[1] - 25), max(0, TREE_BROWN[2] - 25))
+        pygame.draw.rect(
+            self.screen,
+            shadow_col,
+            pygame.Rect(trunk_rect.x + trunk_rect.w // 2, trunk_rect.y, trunk_rect.w // 2, trunk_rect.h),
+            border_radius=max(1, int(3 * size)),
+        )
 
-        # Add some detail to the leaves
-        detail_size = int(10 * size)
-        pygame.draw.circle(self.screen, (46, 139, 87), (x - detail_size, y - trunk_height + detail_size), detail_size)
-        pygame.draw.circle(self.screen, (32, 178, 170), (x + detail_size, y - trunk_height + detail_size), detail_size)
+        # Canopy (overlapping circles reads better than a triangle at distance)
+        canopy_base_y = y - trunk_h
+        r_main = int(28 * size)
+        r_small = int(22 * size)
+
+        canopy_col = TREE_GREEN
+        canopy_dark = (max(0, canopy_col[0] - 25), max(0, canopy_col[1] - 25), max(0, canopy_col[2] - 25))
+        canopy_light = (min(255, canopy_col[0] + 25), min(255, canopy_col[1] + 25), min(255, canopy_col[2] + 25))
+
+        # Dark underlayer
+        pygame.draw.circle(self.screen, canopy_dark, (x, canopy_base_y + int(10 * size)), r_main)
+        pygame.draw.circle(self.screen, canopy_dark, (x - int(24 * size), canopy_base_y + int(14 * size)), r_small)
+        pygame.draw.circle(self.screen, canopy_dark, (x + int(24 * size), canopy_base_y + int(14 * size)), r_small)
+
+        # Main layer
+        pygame.draw.circle(self.screen, canopy_col, (x, canopy_base_y), r_main)
+        pygame.draw.circle(self.screen, canopy_col, (x - int(26 * size), canopy_base_y + int(8 * size)), r_small)
+        pygame.draw.circle(self.screen, canopy_col, (x + int(26 * size), canopy_base_y + int(8 * size)), r_small)
+
+        # Highlight blobs
+        pygame.draw.circle(self.screen, canopy_light, (x - int(10 * size), canopy_base_y - int(10 * size)), int(10 * size))
+        pygame.draw.circle(self.screen, canopy_light, (x + int(12 * size), canopy_base_y - int(6 * size)), int(8 * size))
 
     def draw_game_over_screen(self):
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -404,7 +426,15 @@ class Game:
 
     def draw(self):
         self.screen.fill(BLACK)
-        
+
+        # Background decorations (world-space -> screen-space via camera_x)
+        ground_y = SCREEN_HEIGHT - 200
+        tree_base_y = ground_y
+        for wx, size in [(200, 1.0), (650, 0.9), (1100, 1.2), (1650, 1.0), (2150, 0.85)]:
+            sx = int(wx - self.camera_x)
+            if -200 <= sx <= SCREEN_WIDTH + 200:
+                self.draw_tree(sx, tree_base_y, size=size)
+
         for s in self.all_sprites:
             off_x = s.rect.x - int(self.camera_x)
             if (off_x + s.rect.width > -50) and (off_x < SCREEN_WIDTH + 50):
