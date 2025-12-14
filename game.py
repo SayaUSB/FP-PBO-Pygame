@@ -427,7 +427,7 @@ class Game:
     def draw(self):
         self.screen.fill(SKY_BLUE)
 
-        # Background decorations (world-space -> screen-space via camera_x)
+        # Background decorations
         ground_y = SCREEN_HEIGHT - 200
         tree_base_y = ground_y
         for wx, size in [(200, 1.0), (650, 0.9), (1100, 1.2), (1650, 1.0), (2150, 0.85)]:
