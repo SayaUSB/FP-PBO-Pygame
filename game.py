@@ -88,14 +88,14 @@ class Game:
     def generate_chunk(self, start_x, width):
         if self.boss_fight_active:
             ground_y = SCREEN_HEIGHT - 200
-            ground = Platform(start_x, ground_y, width, 100)
+            ground = Platform(start_x, ground_y, width, SCREEN_HEIGHT - ground_y)
             self.platforms.add(ground)
             self.all_sprites.add(ground)
             self.world_limit = start_x + width
             return
 
         ground_y = SCREEN_HEIGHT - 200
-        ground = Platform(start_x, ground_y, width, 100)
+        ground = Platform(start_x, ground_y, width, SCREEN_HEIGHT - ground_y)
         self.platforms.add(ground)
         self.all_sprites.add(ground)
 
@@ -425,9 +425,9 @@ class Game:
         self.screen.blit(restart_surf, restart_rect)
 
     def draw(self):
-        self.screen.fill(SKY_BLUE)
+        self.screen.fill(BLACK)
 
-        # Background decorations
+        # Background decorations (world-space -> screen-space via camera_x)
         ground_y = SCREEN_HEIGHT - 200
         tree_base_y = ground_y
         for wx, size in [(200, 1.0), (650, 0.9), (1100, 1.2), (1650, 1.0), (2150, 0.85)]:
