@@ -228,8 +228,11 @@ class Helicopter(Enemy):
         self.phase = 0
         self.pos_x = float(x)
 
-        self.width = 100
-        self.height = 50
+        # =====================
+        # UKURAN LEBIH BESAR
+        # =====================
+        self.width = 200
+        self.height = 100
 
         self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self.rect = self.image.get_rect(topleft=(x, y))
@@ -239,30 +242,38 @@ class Helicopter(Enemy):
     def draw_helicopter(self):
         self.image.fill((0, 0, 0, 0))
 
-        # BODY
+        # Main Body
         pygame.draw.ellipse(
             self.image,
             (120, 120, 120),
-            (20, 30, 70, 25)
+            (30, 45, 120, 40)
         )
 
-        # COCKPIT
+        # Cockpit
         pygame.draw.ellipse(
             self.image,
-            (180, 180, 200),
-            (55, 32, 30, 20)
+            (190, 190, 210),
+            (95, 48, 50, 32)
         )
 
-        # TAIL
+        # Frame cockpit
+        pygame.draw.ellipse(
+            self.image,
+            (90, 90, 90),
+            (95, 48, 50, 32),
+            2
+        )
+
+        # Tail boom
         pygame.draw.rect(
             self.image,
             (100, 100, 100),
-            (85, 38, 30, 6)
+            (145, 58, 55, 10)
         )
 
-        # MAIN ROTOR
-        cx, cy = 55, 18
-        length = 50
+        # Main rotor
+        cx, cy = 100, 30
+        length = 90
         angle = self.rotor_angle
 
         x1 = cx + math.cos(angle) * length
@@ -275,26 +286,44 @@ class Helicopter(Enemy):
             (30, 30, 30),
             (x1, y1),
             (x2, y2),
-            5
+            8
         )
 
-        # ROTOR HUB
-        pygame.draw.circle(self.image, (50, 50, 50), (cx, cy), 4)
+        # Second rotor blade
+        x3 = cx + math.cos(angle + math.pi / 2) * length
+        y3 = cy + math.sin(angle + math.pi / 2) * length
+        x4 = cx - math.cos(angle + math.pi / 2) * length
+        y4 = cy - math.sin(angle + math.pi / 2) * length
 
-        # TAIL ROTOR
+        pygame.draw.line(
+            self.image,
+            (40, 40, 40),
+            (x3, y3),
+            (x4, y4),
+            6
+        )
+
+        # Rotor hub
+        pygame.draw.circle(self.image, (60, 60, 60), (cx, cy), 8)
+
+        # Tail rotor
         pygame.draw.line(
             self.image,
             (50, 50, 50),
-            (112, 41),
-            (118, 41),
-            3
+            (188, 63),
+            (198, 63),
+            5
         )
 
+        pygame.draw.circle(self.image, (60, 60, 60), (193, 63), 4)
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
+
+        # Up and down motion
         self.phase += 0.05 * DT
         self.rect.y = self.start_y + math.sin(self.phase) * 30
 
+        # Follow player
         if self.rect.x < player.rect.x - 200:
             self.pos_x += 2 * DT
         elif self.rect.x > player.rect.x + 200:
@@ -302,8 +331,8 @@ class Helicopter(Enemy):
 
         self.rect.x = int(self.pos_x)
 
+        # Rotor Spin
         self.rotor_angle += 0.4 * DT
-
         self.draw_helicopter()
 
         # Shooting
