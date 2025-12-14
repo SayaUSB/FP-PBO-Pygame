@@ -107,28 +107,108 @@ class Tank(Enemy):
 class Helicopter(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, GREY, 60, 'heli', 500, 50)
+
         self.start_y = y
         self.phase = 0
         self.pos_x = float(x)
 
+        self.width = 100
+        self.height = 50
+
+        self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+        self.rotor_angle = 0
+
+    def draw_helicopter(self):
+        self.image.fill((0, 0, 0, 0))
+
+        # BODY
+        pygame.draw.ellipse(
+            self.image,
+            (120, 120, 120),
+            (20, 30, 70, 25)
+        )
+
+        # COCKPIT
+        pygame.draw.ellipse(
+            self.image,
+            (180, 180, 200),
+            (55, 32, 30, 20)
+        )
+
+        # TAIL
+        pygame.draw.rect(
+            self.image,
+            (100, 100, 100),
+            (85, 38, 30, 6)
+        )
+
+        # MAIN ROTOR
+        cx, cy = 55, 18
+        length = 50
+        angle = self.rotor_angle
+
+        x1 = cx + math.cos(angle) * length
+        y1 = cy + math.sin(angle) * length
+        x2 = cx - math.cos(angle) * length
+        y2 = cy - math.sin(angle) * length
+
+        pygame.draw.line(
+            self.image,
+            (30, 30, 30),
+            (x1, y1),
+            (x2, y2),
+            5
+        )
+
+        # ROTOR HUB
+        pygame.draw.circle(self.image, (50, 50, 50), (cx, cy), 4)
+
+        # TAIL ROTOR
+        pygame.draw.line(
+            self.image,
+            (50, 50, 50),
+            (112, 41),
+            (118, 41),
+            3
+        )
+
+
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
         self.phase += 0.05 * DT
         self.rect.y = self.start_y + math.sin(self.phase) * 30
-        
-        if self.rect.x < player.rect.x - 200: self.pos_x += 2 * DT
-        elif self.rect.x > player.rect.x + 200: self.pos_x -= 2 * DT
-        
+
+        if self.rect.x < player.rect.x - 200:
+            self.pos_x += 2 * DT
+        elif self.rect.x > player.rect.x + 200:
+            self.pos_x -= 2 * DT
+
         self.rect.x = int(self.pos_x)
-        
+
+        self.rotor_angle += 0.4 * DT
+
+        self.draw_helicopter()
+
+        # Shooting
         self.shoot_timer += 1 * DT
         if self.shoot_timer > 70 and abs(player.rect.x - self.rect.x) < 1000:
             dx = player.rect.centerx - self.rect.centerx
             dy = player.rect.centery - self.rect.centery
             angle = math.atan2(dy, dx)
+
             vel_x = math.cos(angle)
             vel_y = math.sin(angle)
-            
-            b = Bullet(self.rect.centerx, self.rect.bottom, vel_x, vel_y, damage=20, is_enemy=True, bullet_img=bullet_img)
+
+            b = Bullet(
+                self.rect.centerx,
+                self.rect.bottom,
+                vel_x,
+                vel_y,
+                damage=20,
+                is_enemy=True,
+                bullet_img=bullet_img
+            )
             bullets.add(b)
             all_sprites.add(b)
             self.shoot_timer = 0
