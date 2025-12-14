@@ -87,14 +87,14 @@ class Game:
 
     def generate_chunk(self, start_x, width):
         if self.boss_fight_active:
-            ground_y = SCREEN_HEIGHT - 60
+            ground_y = SCREEN_HEIGHT - 200
             ground = Platform(start_x, ground_y, width, 100)
             self.platforms.add(ground)
             self.all_sprites.add(ground)
             self.world_limit = start_x + width
             return
 
-        ground_y = SCREEN_HEIGHT - 60
+        ground_y = SCREEN_HEIGHT - 200
         ground = Platform(start_x, ground_y, width, 100)
         self.platforms.add(ground)
         self.all_sprites.add(ground)
