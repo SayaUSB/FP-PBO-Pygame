@@ -4,7 +4,7 @@ import pygame
 SCREEN_WIDTH  = 1920
 SCREEN_HEIGHT = 1080
 FPS           = 144
-DT            = 80 / FPS
+DT            = 100 / FPS
 
 # Physics
 GRAVITY = 0.8
@@ -24,3 +24,6 @@ ORANGE                  = (255, 140, 0)
 PINK                    = (255, 105, 180)
 PURPLE                  = (128, 0, 128)
 SEMI_TRANSPARENT_BLACK  = (0, 0, 0, 180)
+SKY_BLUE                = (135, 206, 235)
+TREE_GREEN              = (34, 139, 34)
+TREE_BROWN              = (139, 69, 19)
