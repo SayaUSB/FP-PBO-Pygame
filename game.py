@@ -359,6 +359,27 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
 
+    def draw_tree(self, x, y, size=1.0):
+        # Trunk
+        trunk_height = int(40 * size)
+        trunk_width = int(15 * size)
+        pygame.draw.rect(self.screen, TREE_BROWN, (x - trunk_width//2, y - trunk_height, trunk_width, trunk_height))
+
+        # Leaves (triangle)
+        leaves_height = int(60 * size)
+        leaves_width = int(80 * size)
+        leaves_points = [
+            (x, y - trunk_height),  # Top center
+            (x - leaves_width//2, y - trunk_height + leaves_height),  # Bottom left
+            (x + leaves_width//2, y - trunk_height + leaves_height)   # Bottom right
+        ]
+        pygame.draw.polygon(self.screen, TREE_GREEN, leaves_points)
+
+        # Add some detail to the leaves
+        detail_size = int(10 * size)
+        pygame.draw.circle(self.screen, (46, 139, 87), (x - detail_size, y - trunk_height + detail_size), detail_size)
+        pygame.draw.circle(self.screen, (32, 178, 170), (x + detail_size, y - trunk_height + detail_size), detail_size)
+
     def draw_game_over_screen(self):
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill(SEMI_TRANSPARENT_BLACK)
