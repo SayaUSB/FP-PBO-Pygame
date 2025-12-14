@@ -66,20 +66,95 @@ class Soldier(Enemy):
 class Tank(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, DARK_GREEN, 120, 'tank', 300, 30)
-        self.image = pygame.Surface((90, 60))
-        self.image.fill(DARK_GREEN)
+        self.width = 240
+        self.height = 140
+
+        self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self.rect = self.image.get_rect()
         self.rect.bottomleft = (x, y)
-        self.pos_x = float(x)
+
+        self.pos_x = float(self.rect.x)
         self.pos_y = float(self.rect.y)
+
         self.vel_y = 0
         self.speed = 1
+        self.turret_angle = 0
+
+    def draw_tank(self, player):
+        self.image.fill((0, 0, 0, 0))
+
+        # Chains
+        pygame.draw.rect(
+            self.image,
+            (40, 40, 40),
+            (20, 90, 200, 36),
+            border_radius=18
+        )
+
+        # Wheels
+        for i in range(8):
+            pygame.draw.circle(
+                self.image,
+                (90, 90, 90),
+                (40 + i * 22, 108),
+                12
+            )
+
+        # Upper body
+        pygame.draw.rect(
+            self.image,
+            DARK_GREEN,
+            (35, 50, 170, 50),
+            border_radius=18
+        )
+
+        # Panel detail
+        pygame.draw.rect(
+            self.image,
+            (60, 120, 60),
+            (55, 60, 60, 30),
+            border_radius=8
+        )
+
+        # Turret Base
+        turret_base_center = (120, 50)
+        pygame.draw.circle(
+            self.image,
+            (70, 130, 70),
+            turret_base_center,
+            26
+        )
+
+        # Turret
+        dx = player.rect.centerx - self.rect.centerx
+        dy = player.rect.centery - self.rect.centery
+        self.turret_angle = math.atan2(dy, dx)
+
+        barrel_length = 80
+        end_x = turret_base_center[0] + math.cos(self.turret_angle) * barrel_length
+        end_y = turret_base_center[1] + math.sin(self.turret_angle) * barrel_length
+
+        pygame.draw.line(
+            self.image,
+            (30, 30, 30),
+            turret_base_center,
+            (end_x, end_y),
+            12
+        )
+
+        pygame.draw.circle(
+            self.image,
+            (20, 20, 20),
+            (int(end_x), int(end_y)),
+            6
+        )
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
+        # Gravity
         self.vel_y += GRAVITY * DT
         self.pos_y += self.vel_y * DT
         self.rect.y = int(self.pos_y)
-        
+
         hits = pygame.sprite.spritecollide(self, platforms, False)
         for p in hits:
             if self.vel_y > 0:
@@ -88,20 +163,61 @@ class Tank(Enemy):
                 self.pos_y = float(self.rect.y)
 
         self.check_bounds()
+
+        # Move to player
         dist_x = player.rect.x - self.rect.x
-
         if 200 < abs(dist_x) < 1200:
-            if dist_x > 0: self.pos_x += self.speed * DT
-            else: self.pos_x -= self.speed * DT
-        
+            self.pos_x += self.speed * DT if dist_x > 0 else -self.speed * DT
+
         self.rect.x = int(self.pos_x)
+        self.draw_tank(player)
 
+        # Fire missile
         self.shoot_timer += 1 * DT
-
-        if self.shoot_timer > 180 and abs(dist_x) < 1200: 
-            m = Missile(self.rect.centerx, self.rect.centery - 20, player)
+        if self.shoot_timer > 180 and abs(dist_x) < 1200:
+            m = Missile(
+                self.rect.centerx,
+                self.rect.centery - 40,
+                player
+            )
             all_sprites.add(m)
-            missiles_group.add(m) 
+            missiles_group.add(m)
+            self.shoot_timer = 0
+
+    def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
+        self.vel_y += GRAVITY * DT
+        self.pos_y += self.vel_y * DT
+        self.rect.y = int(self.pos_y)
+
+        hits = pygame.sprite.spritecollide(self, platforms, False)
+        for p in hits:
+            if self.vel_y > 0:
+                self.rect.bottom = p.rect.top
+                self.vel_y = 0
+                self.pos_y = float(self.rect.y)
+
+        self.check_bounds()
+
+        dist_x = player.rect.x - self.rect.x
+        if 200 < abs(dist_x) < 1200:
+            if dist_x > 0:
+                self.pos_x += self.speed * DT
+            else:
+                self.pos_x -= self.speed * DT
+
+        self.rect.x = int(self.pos_x)
+        self.draw_tank(player)
+
+        # Missile
+        self.shoot_timer += 1 * DT
+        if self.shoot_timer > 180 and abs(dist_x) < 1200:
+            m = Missile(
+                self.rect.centerx,
+                self.rect.centery - 30,
+                player
+            )
+            all_sprites.add(m)
+            missiles_group.add(m)
             self.shoot_timer = 0
 
 class Helicopter(Enemy):
