@@ -4,7 +4,7 @@ import pygame
 SCREEN_WIDTH  = 1920
 SCREEN_HEIGHT = 1080
 FPS           = 144
-DT            = 100 / FPS
+DT            = 60 / FPS
 
 # Physics
 GRAVITY = 0.8
