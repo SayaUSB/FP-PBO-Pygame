@@ -160,6 +160,10 @@ class Game:
                 e.hp -= EXPLOSION_DAMAGE
                 self.add_score(e.hit_score) 
                 if e.hp <= 0:
+                    if e.type_name == 'tank':
+                        expl = Explosion(e.rect.centerx, e.rect.centery)
+                        self.all_sprites.add(expl)
+                        self.effects.add(expl)
                     self.spawn_loot(e)
                     self.add_score(e.score_val)
                     e.kill()
