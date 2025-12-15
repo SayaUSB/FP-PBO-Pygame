@@ -30,8 +30,6 @@ class Game:
 
         self.bg_seed = random.randint(0, 2**31 - 1)
         self.bg_layers = {}
-        self.waterfalls = []
-        self.next_waterfall_x = 0
         self.birds = []
         self.bird_spawn_timer = 0
         self._build_background_layers()
@@ -107,16 +105,6 @@ class Game:
             "forest": {"surf": forest, "parallax": 0.45, "y": 0},
         }
 
-    def spawn_waterfall_near_player(self):
-        rng = random.Random((self.bg_seed + int(self.next_waterfall_x) * 9973) & 0xFFFFFFFF)
-        spacing = rng.randint(1400, 2200)
-        self.next_waterfall_x += spacing
-        top_y = rng.randint(int(SCREEN_HEIGHT * 0.42), int(SCREEN_HEIGHT * 0.58))
-        ground_y = SCREEN_HEIGHT - 200
-        h = max(240, min(520, ground_y - top_y))
-        w = rng.randint(70, 130)
-        self.waterfalls.append({"x": float(self.next_waterfall_x), "y": float(top_y), "w": int(w), "h": int(h), "phase": rng.random() * 10.0})
-
     def spawn_bird(self):
         rng = random.Random((self.bg_seed + int(self.camera_x) * 31 + len(self.birds) * 17) & 0xFFFFFFFF)
         y = rng.randint(80, int(SCREEN_HEIGHT * 0.35))
@@ -134,33 +122,6 @@ class Game:
         p3 = (sx + w, int(y + flap))
         pygame.draw.lines(self.screen, col, False, [p1, p2, p3], 2)
 
-    def draw_waterfall(self, sx, top_y, w, h, phase):
-        fall = pygame.Surface((w, h), pygame.SRCALPHA)
-        fall.fill((0, 0, 0, 0))
-        base = (70, 170, 210)
-        foam = (220, 245, 255)
-        shade = (40, 120, 160)
-        t = pygame.time.get_ticks() / 1000.0
-        for x in range(0, w, 6):
-            off = int((math.sin(t * 2.3 + phase + x * 0.08) + 1) * 4)
-            alpha = 90 + (x % 12) * 6
-            pygame.draw.line(fall, (*base, min(200, alpha)), (x, 0), (x + off, h), 3)
-        for x in range(0, w, 16):
-            pygame.draw.line(fall, (*shade, 90), (x, 0), (x, h), 2)
-
-        splash_h = min(110, max(50, h // 5))
-        splash = pygame.Surface((w + 140, splash_h), pygame.SRCALPHA)
-        splash.fill((0, 0, 0, 0))
-        for i in range(45):
-            px = (w // 2) + int(math.cos(phase + i) * (30 + (i % 10) * 5)) + 70
-            py = int(splash_h * 0.55 + math.sin(t * 3.2 + i) * 10)
-            r = 2 + (i % 3)
-            pygame.draw.circle(splash, (*foam, 140), (px, py), r)
-        pygame.draw.ellipse(splash, (*foam, 90), (0, int(splash_h * 0.55), w + 140, int(splash_h * 0.5)))
-
-        self.screen.blit(fall, (sx, int(top_y)))
-        self.screen.blit(splash, (sx - 70, int(top_y + h - splash_h // 2)))
-
     def draw_scenery(self):
         for layer in ("mountain", "forest"):
             info = self.bg_layers.get(layer)
@@ -173,11 +134,6 @@ class Game:
             ox = int(self.camera_x * par) % w
             self.screen.blit(surf, (-ox, y))
             self.screen.blit(surf, (-ox + w, y))
-
-        for wf in self.waterfalls:
-            sx = int(wf["x"] - self.camera_x)
-            if -400 <= sx <= SCREEN_WIDTH + 400:
-                self.draw_waterfall(sx, wf["y"], wf["w"], wf["h"], wf["phase"])
 
         for b in self.birds:
             sx = int(b["x"] - self.camera_x)
@@ -247,8 +203,6 @@ class Game:
 
         self.trees = []
         self.next_tree_x = 0
-        self.waterfalls = []
-        self.next_waterfall_x = 0
         self.birds = []
         self.bird_spawn_timer = 60
 
@@ -443,9 +397,6 @@ class Game:
 
         while self.next_tree_x < spawn_limit:
             self.spawn_tree_near_player()
-
-        while self.next_waterfall_x < spawn_limit:
-            self.spawn_waterfall_near_player()
 
         if self.bird_spawn_timer > 0:
             self.bird_spawn_timer -= 1 * DT
