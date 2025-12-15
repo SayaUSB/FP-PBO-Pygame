@@ -120,7 +120,7 @@ class Player(pygame.sprite.Sprite):
                 add_score_callback(50) 
                 
                 if e.hp <= 0:
-                    if e.type_name == 'soldier':
+                    if e.type_name in ('soldier', 'paratrooper'):
                         death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
                         all_sprites.add(death)
                         effects_group.add(death)

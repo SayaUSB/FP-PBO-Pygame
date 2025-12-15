@@ -287,7 +287,7 @@ class Game:
                 self.items.add(item)
                 self.all_sprites.add(item)
         
-        elif enemy.type_name == 'soldier':
+        elif enemy.type_name in ('soldier', 'paratrooper'):
             if random.random() < 0.25:
                 item = HealthPack(enemy.rect.centerx, enemy.rect.centery)
                 self.items.add(item)
@@ -311,7 +311,7 @@ class Game:
                 e.hp -= EXPLOSION_DAMAGE
                 self.add_score(e.hit_score) 
             if e.hp <= 0:
-                if e.type_name == 'soldier':
+                if e.type_name in ('soldier', 'paratrooper'):
                     death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
                     self.all_sprites.add(death)
                     self.effects.add(death)
@@ -482,7 +482,7 @@ class Game:
                 self.add_score(e.hit_score) 
             
             if e.hp <= 0:
-                if e.type_name == 'soldier':
+                if e.type_name in ('soldier', 'paratrooper'):
                     death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
                     self.all_sprites.add(death)
                     self.effects.add(death)
@@ -523,11 +523,18 @@ class Game:
         # player vs enemy bullet / missile
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         for bullet in player_hit_list:
+            expl = SmallExplosion(bullet.rect.centerx, bullet.rect.centery)
+            self.all_sprites.add(expl)
+            self.effects.add(expl)
             self.player.take_damage(bullet.damage)
             
-        missile_hit_player = pygame.sprite.spritecollide(self.player, self.missiles, True)
+        missile_hit_player = pygame.sprite.spritecollide(self.player, self.missiles, False)
         for m in missile_hit_player:
+            expl = MediumExplosion(m.rect.centerx, m.rect.centery)
+            self.all_sprites.add(expl)
+            self.effects.add(expl)
             self.player.take_damage(m.damage)
+            m.kill()
 
         # items
         item_hits = pygame.sprite.spritecollide(self.player, self.items, True)
