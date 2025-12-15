@@ -93,6 +93,7 @@ class Missile(pygame.sprite.Sprite):
         self.vel_x = 0
         self.vel_y = 0
         self.flame_phase = 0
+        self.explode_now = False
 
     def update(self):
         self.timer += 1 * DT
@@ -123,7 +124,7 @@ class Missile(pygame.sprite.Sprite):
         self.rect.centery = int(self.pos_y)
         
         if self.timer >= self.fuel_limit:
-            self.kill() 
+            self.explode_now = True
 
         if self.rect.x < -200 or self.rect.x > 100000:
             self.kill()

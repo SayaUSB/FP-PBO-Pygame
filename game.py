@@ -395,6 +395,12 @@ class Game:
         self.enemy_grenades.update() 
         self.enemy_bullets.update()
         self.missiles.update() 
+        for m in list(self.missiles):
+            if getattr(m, 'explode_now', False):
+                expl = MediumExplosion(m.rect.centerx, m.rect.centery)
+                self.all_sprites.add(expl)
+                self.effects.add(expl)
+                m.kill()
         self.items.update(self.platforms)
         self.effects.update()
 
