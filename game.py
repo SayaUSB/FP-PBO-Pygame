@@ -28,6 +28,162 @@ class Game:
         self.trees = []
         self.next_tree_x = 0
 
+        self.bg_seed = random.randint(0, 2**31 - 1)
+        self.bg_layers = {}
+        self.waterfalls = []
+        self.next_waterfall_x = 0
+        self.birds = []
+        self.bird_spawn_timer = 0
+        self._build_background_layers()
+
+    def _build_background_layers(self):
+        rng = random.Random(self.bg_seed)
+
+        mw = max(SCREEN_WIDTH * 2, 2400)
+        mh = SCREEN_HEIGHT
+        mountain = pygame.Surface((mw, mh), pygame.SRCALPHA)
+        mountain.fill((0, 0, 0, 0))
+
+        horizon_y = int(SCREEN_HEIGHT * 0.64)
+        base_y = int(SCREEN_HEIGHT * 0.88)
+        x = 0
+        peaks = []
+        while x < mw + 200:
+            peak_w = rng.randint(260, 520)
+            peak_h = rng.randint(180, 420)
+            px = x + rng.randint(-40, 40)
+            py = horizon_y - peak_h
+            peaks.append((px, py, peak_w, peak_h))
+            x += int(peak_w * 0.65)
+
+        col1 = (90, 110, 150)
+        col2 = (65, 85, 120)
+        snow = (235, 245, 255)
+        snow_shadow = (190, 210, 230)
+
+        for i, (px, py, peak_w, peak_h) in enumerate(peaks):
+            col = col1 if i % 2 == 0 else col2
+            left = (px, base_y)
+            top = (px + peak_w // 2, py)
+            right = (px + peak_w, base_y)
+            pygame.draw.polygon(mountain, col, [left, top, right])
+            pygame.draw.polygon(mountain, (max(0, col[0] - 18), max(0, col[1] - 18), max(0, col[2] - 18)), [(px + peak_w // 2, py), (px + int(peak_w * 0.72), base_y), right])
+
+            cap_h = int(peak_h * 0.18)
+            cap = [(top[0], top[1] + cap_h), (top[0] - int(peak_w * 0.12), top[1] + int(cap_h * 1.4)), (top[0], top[1]), (top[0] + int(peak_w * 0.10), top[1] + int(cap_h * 1.25))]
+            pygame.draw.polygon(mountain, snow, cap)
+            pygame.draw.polygon(mountain, snow_shadow, [(cap[2][0], cap[2][1]), (cap[3][0], cap[3][1]), (cap[0][0], cap[0][1] + 3)])
+
+        pygame.draw.rect(mountain, (70, 95, 120, 80), (0, base_y, mw, SCREEN_HEIGHT - base_y))
+
+        fw = max(SCREEN_WIDTH * 2, 2400)
+        fh = SCREEN_HEIGHT
+        forest = pygame.Surface((fw, fh), pygame.SRCALPHA)
+        forest.fill((0, 0, 0, 0))
+
+        ridge_y = int(SCREEN_HEIGHT * 0.78)
+        ridge = [(0, ridge_y)]
+        rx = 0
+        while rx <= fw:
+            ridge.append((rx, ridge_y + rng.randint(-18, 22)))
+            rx += rng.randint(80, 160)
+        ridge.append((fw, ridge_y))
+        ridge.append((fw, SCREEN_HEIGHT))
+        ridge.append((0, SCREEN_HEIGHT))
+        pygame.draw.polygon(forest, (25, 70, 45, 200), ridge)
+
+        for _ in range(140):
+            tx = rng.randrange(0, fw)
+            ty = ridge_y + rng.randint(-10, 70)
+            size = rng.uniform(0.55, 1.25)
+            th = int(80 * size)
+            tw = max(8, int(34 * size))
+            pygame.draw.rect(forest, (35, 60, 35, 220), (tx - tw // 6, ty, max(2, tw // 3), th), border_radius=2)
+            pygame.draw.polygon(forest, (20, 90, 40, 230), [(tx, ty - int(40 * size)), (tx - tw, ty + int(10 * size)), (tx + tw, ty + int(10 * size))])
+            pygame.draw.polygon(forest, (18, 75, 35, 230), [(tx, ty - int(20 * size)), (tx - int(tw * 0.86), ty + int(28 * size)), (tx + int(tw * 0.86), ty + int(28 * size))])
+
+        self.bg_layers = {
+            "mountain": {"surf": mountain, "parallax": 0.25, "y": 0},
+            "forest": {"surf": forest, "parallax": 0.45, "y": 0},
+        }
+
+    def spawn_waterfall_near_player(self):
+        rng = random.Random((self.bg_seed + int(self.next_waterfall_x) * 9973) & 0xFFFFFFFF)
+        spacing = rng.randint(1400, 2200)
+        self.next_waterfall_x += spacing
+        top_y = rng.randint(int(SCREEN_HEIGHT * 0.42), int(SCREEN_HEIGHT * 0.58))
+        ground_y = SCREEN_HEIGHT - 200
+        h = max(240, min(520, ground_y - top_y))
+        w = rng.randint(70, 130)
+        self.waterfalls.append({"x": float(self.next_waterfall_x), "y": float(top_y), "w": int(w), "h": int(h), "phase": rng.random() * 10.0})
+
+    def spawn_bird(self):
+        rng = random.Random((self.bg_seed + int(self.camera_x) * 31 + len(self.birds) * 17) & 0xFFFFFFFF)
+        y = rng.randint(80, int(SCREEN_HEIGHT * 0.35))
+        speed = rng.uniform(4.0, 8.0)
+        size = rng.uniform(0.8, 1.6)
+        self.birds.append({"x": float(self.camera_x + SCREEN_WIDTH + rng.randint(80, 240)), "y": float(y), "vx": -speed, "phase": rng.random() * 6.28, "size": size})
+
+    def draw_bird(self, sx, y, phase, size=1.0):
+        col = (30, 30, 30)
+        w = int(22 * size)
+        h = int(10 * size)
+        flap = math.sin(phase) * (4 * size)
+        p1 = (sx - w, int(y + flap))
+        p2 = (sx, int(y - flap))
+        p3 = (sx + w, int(y + flap))
+        pygame.draw.lines(self.screen, col, False, [p1, p2, p3], 2)
+
+    def draw_waterfall(self, sx, top_y, w, h, phase):
+        fall = pygame.Surface((w, h), pygame.SRCALPHA)
+        fall.fill((0, 0, 0, 0))
+        base = (70, 170, 210)
+        foam = (220, 245, 255)
+        shade = (40, 120, 160)
+        t = pygame.time.get_ticks() / 1000.0
+        for x in range(0, w, 6):
+            off = int((math.sin(t * 2.3 + phase + x * 0.08) + 1) * 4)
+            alpha = 90 + (x % 12) * 6
+            pygame.draw.line(fall, (*base, min(200, alpha)), (x, 0), (x + off, h), 3)
+        for x in range(0, w, 16):
+            pygame.draw.line(fall, (*shade, 90), (x, 0), (x, h), 2)
+
+        splash_h = min(110, max(50, h // 5))
+        splash = pygame.Surface((w + 140, splash_h), pygame.SRCALPHA)
+        splash.fill((0, 0, 0, 0))
+        for i in range(45):
+            px = (w // 2) + int(math.cos(phase + i) * (30 + (i % 10) * 5)) + 70
+            py = int(splash_h * 0.55 + math.sin(t * 3.2 + i) * 10)
+            r = 2 + (i % 3)
+            pygame.draw.circle(splash, (*foam, 140), (px, py), r)
+        pygame.draw.ellipse(splash, (*foam, 90), (0, int(splash_h * 0.55), w + 140, int(splash_h * 0.5)))
+
+        self.screen.blit(fall, (sx, int(top_y)))
+        self.screen.blit(splash, (sx - 70, int(top_y + h - splash_h // 2)))
+
+    def draw_scenery(self):
+        for layer in ("mountain", "forest"):
+            info = self.bg_layers.get(layer)
+            if not info:
+                continue
+            surf = info["surf"]
+            par = info["parallax"]
+            y = info["y"]
+            w = surf.get_width()
+            ox = int(self.camera_x * par) % w
+            self.screen.blit(surf, (-ox, y))
+            self.screen.blit(surf, (-ox + w, y))
+
+        for wf in self.waterfalls:
+            sx = int(wf["x"] - self.camera_x)
+            if -400 <= sx <= SCREEN_WIDTH + 400:
+                self.draw_waterfall(sx, wf["y"], wf["w"], wf["h"], wf["phase"])
+
+        for b in self.birds:
+            sx = int(b["x"] - self.camera_x)
+            if -200 <= sx <= SCREEN_WIDTH + 200:
+                self.draw_bird(sx, b["y"], b["phase"], b["size"])
+
     def spawn_tree_near_player(self):
         spacing = random.randint(220, 360)
         self.next_tree_x += spacing
@@ -88,6 +244,13 @@ class Game:
         self.camera_x = 0
         self.world_limit = 0
         self.generate_chunk(0, 1000)
+
+        self.trees = []
+        self.next_tree_x = 0
+        self.waterfalls = []
+        self.next_waterfall_x = 0
+        self.birds = []
+        self.bird_spawn_timer = 60
 
     def apply_miss_penalty(self, amount):
         if self.game_state == "playing":
@@ -280,6 +443,22 @@ class Game:
 
         while self.next_tree_x < spawn_limit:
             self.spawn_tree_near_player()
+
+        while self.next_waterfall_x < spawn_limit:
+            self.spawn_waterfall_near_player()
+
+        if self.bird_spawn_timer > 0:
+            self.bird_spawn_timer -= 1 * DT
+        else:
+            if random.random() < 0.6:
+                self.spawn_bird()
+            self.bird_spawn_timer = random.randint(160, 320)
+
+        for b in list(self.birds):
+            b["x"] += b["vx"] * DT
+            b["phase"] += 0.25 * DT
+            if b["x"] < self.camera_x - 400:
+                self.birds.remove(b)
 
         
         # grenade explosions
@@ -572,6 +751,8 @@ class Game:
 
     def draw(self):
         self.screen.fill(SKY_BLUE)
+
+        self.draw_scenery()
 
         # Background decorations (world-space -> screen-space via camera_x)
         for t in self.trees:
