@@ -27,9 +27,109 @@ class Enemy(pygame.sprite.Sprite):
 class Soldier(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, RED, 30, 'soldier', 100, 10)
-        self.vel_y = 0
+        self.width = 48
+        self.height = 82
         self.facing = -1
+        self.walk_timer = 0
+        self.walk_index = 0
+        self.shoot_anim_timer = 0
+        self.frames = {
+            1: {
+                'idle': self._draw_soldier_frame(1, 0, False),
+                'walk': [self._draw_soldier_frame(1, i, False) for i in range(4)],
+                'shoot': self._draw_soldier_frame(1, 1, True),
+            },
+            -1: {
+                'idle': self._draw_soldier_frame(-1, 0, False),
+                'walk': [self._draw_soldier_frame(-1, i, False) for i in range(4)],
+                'shoot': self._draw_soldier_frame(-1, 1, True),
+            },
+        }
+        self.image = self.frames[self.facing]['idle']
+        self.rect = self.image.get_rect(bottomleft=(x, y))
+        self.pos_x = float(self.rect.x)
+        self.pos_y = float(self.rect.y)
+        self.vel_y = 0
         self.speed = 2
+
+    def _draw_soldier_frame(self, facing, step, shooting):
+        w = self.width
+        h = self.height
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        skin = (220, 180, 140)
+        uniform = (70, 110, 70)
+        uniform_dark = (45, 75, 45)
+        helmet = (55, 70, 60)
+        helmet_dark = (35, 45, 40)
+        backpack = (60, 60, 60)
+        backpack_dark = (40, 40, 40)
+        boots = (30, 30, 30)
+        gun = (25, 25, 25)
+        visor = (120, 170, 190)
+
+        head_r = max(7, int(h * 0.10))
+        head_c = (int(w * 0.52), int(h * 0.18))
+        pygame.draw.circle(surf, skin, head_c, head_r)
+        pygame.draw.circle(surf, helmet, (head_c[0], head_c[1] - 1), head_r + 1)
+        pygame.draw.circle(surf, helmet_dark, (head_c[0] - 2, head_c[1] - 2), head_r + 1, 2)
+        pygame.draw.rect(surf, visor, (head_c[0] - head_r + 2, head_c[1] - 1, head_r * 2 - 4, max(3, head_r // 2)), border_radius=2)
+
+        torso = pygame.Rect(int(w * 0.34), int(h * 0.28), int(w * 0.38), int(h * 0.30))
+        pygame.draw.rect(surf, uniform, torso, border_radius=4)
+        pygame.draw.rect(surf, uniform_dark, (torso.x, torso.y + torso.h // 2, torso.w, torso.h // 2), border_radius=4)
+
+        pack = pygame.Rect(int(w * 0.22), int(h * 0.32), int(w * 0.16), int(h * 0.22))
+        pygame.draw.rect(surf, backpack, pack, border_radius=3)
+        pygame.draw.rect(surf, backpack_dark, (pack.x, pack.y + pack.h // 2, pack.w, pack.h // 2), border_radius=3)
+
+        pelvis = pygame.Rect(int(w * 0.35), int(h * 0.58), int(w * 0.34), int(h * 0.10))
+        pygame.draw.rect(surf, uniform_dark, pelvis, border_radius=3)
+
+        walk = [
+            (-3, 3, 2, -2),
+            (2, -2, -3, 3),
+            (3, -3, -2, 2),
+            (-2, 2, 3, -3),
+        ][step % 4]
+
+        shoulder_y = int(h * 0.38)
+        left_shoulder = (int(w * 0.36), shoulder_y)
+        right_shoulder = (int(w * 0.66), shoulder_y)
+        left_hand = (int(w * 0.28), int(h * 0.52) + walk[0])
+        right_hand = (int(w * 0.80), int(h * 0.44) + walk[1])
+
+        if shooting:
+            right_hand = (int(w * 0.80), int(h * 0.42))
+
+        pygame.draw.line(surf, uniform, left_shoulder, left_hand, 5)
+        pygame.draw.line(surf, uniform, right_shoulder, right_hand, 5)
+
+        hip_y = int(h * 0.70)
+        left_hip = (int(w * 0.46), hip_y)
+        right_hip = (int(w * 0.58), hip_y)
+        left_foot = (int(w * 0.42) + walk[2], int(h * 0.96))
+        right_foot = (int(w * 0.62) + walk[3], int(h * 0.96))
+        pygame.draw.line(surf, uniform, left_hip, left_foot, 6)
+        pygame.draw.line(surf, uniform, right_hip, right_foot, 6)
+        pygame.draw.rect(surf, boots, (left_foot[0] - 7, left_foot[1] - 3, 14, 6), border_radius=2)
+        pygame.draw.rect(surf, boots, (right_foot[0] - 7, right_foot[1] - 3, 14, 6), border_radius=2)
+
+        recoil = -3 if shooting else 0
+        gun_rect = pygame.Rect(int(w * 0.66) + recoil, int(h * 0.41), int(w * 0.30), max(5, int(h * 0.055)))
+        pygame.draw.rect(surf, gun, gun_rect, border_radius=2)
+        pygame.draw.rect(surf, (60, 60, 60), (gun_rect.x + int(w * 0.04), gun_rect.y + 1, int(w * 0.10), gun_rect.h - 2), border_radius=2)
+        pygame.draw.rect(surf, gun, (gun_rect.right - 3, gun_rect.y + 1, 3, gun_rect.h - 2))
+
+        if shooting:
+            muzzle_x = gun_rect.right + 2
+            muzzle_y = gun_rect.centery
+            pygame.draw.polygon(surf, (255, 200, 60), [(muzzle_x, muzzle_y), (muzzle_x + 10, muzzle_y - 5), (muzzle_x + 10, muzzle_y + 5)])
+            pygame.draw.circle(surf, (255, 240, 180), (muzzle_x + 6, muzzle_y), 3)
+
+        if facing == -1:
+            surf = pygame.transform.flip(surf, True, False)
+        return surf
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
         self.vel_y += GRAVITY * DT
@@ -55,6 +155,25 @@ class Soldier(Enemy):
                 self.facing = -1
         
         self.rect.x = int(self.pos_x)
+        moving = 5 < abs(dist_x) < 1000
+        if moving:
+            self.walk_timer += 0.14 * DT
+            self.walk_index = int(self.walk_timer) % 4
+        else:
+            self.walk_timer = 0
+            self.walk_index = 0
+
+        if self.shoot_anim_timer > 0:
+            self.shoot_anim_timer -= 1 * DT
+
+        bl = self.rect.bottomleft
+        if self.shoot_anim_timer > 0:
+            self.image = self.frames[self.facing]['shoot']
+        elif moving:
+            self.image = self.frames[self.facing]['walk'][self.walk_index]
+        else:
+            self.image = self.frames[self.facing]['idle']
+        self.rect = self.image.get_rect(bottomleft=bl)
         self.shoot_timer += 1 * DT
 
         if self.shoot_timer > 90 and abs(dist_x) < 800:
@@ -63,6 +182,7 @@ class Soldier(Enemy):
                 bullets.add(b)
                 all_sprites.add(b)
                 self.shoot_timer = 0
+                self.shoot_anim_timer = 10
 
 class Tank(Enemy):
     def __init__(self, x, y):
@@ -228,101 +348,152 @@ class Helicopter(Enemy):
         self.start_y = y
         self.phase = 0
         self.pos_x = float(x)
+        self.pos_y = float(y)
+        self.vel_y = 0
+        self.facing = 1
 
-        # =====================
-        # UKURAN LEBIH BESAR
-        # =====================
+        self.crashing = False
+        self.crash_vx = 0.0
+        self.crash_angle = 0.0
+        self.crash_spin = 0.0
+        self.crash_impact = False
+        self.crash_impact_pos = None
+
         self.width = 200
         self.height = 100
 
-        self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self.base_image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self.image = self.base_image
         self.rect = self.image.get_rect(topleft=(x, y))
 
         self.rotor_angle = 0
 
+    def begin_crash(self):
+        if self.crashing:
+            return
+        self.crashing = True
+        self.crash_vx = (-1.2 if self.facing < 0 else 1.2) + random.uniform(-0.4, 0.4)
+        self.crash_spin = (-2.5 if self.facing < 0 else 2.5) + random.uniform(-1.2, 1.2)
+        self.vel_y = 0
+        self.pos_x = float(self.rect.x)
+        self.pos_y = float(self.rect.y)
+        self.crash_angle = 0.0
+        self.crash_impact = False
+        self.crash_impact_pos = None
+
     def draw_helicopter(self):
-        self.image.fill((0, 0, 0, 0))
+        self.base_image.fill((0, 0, 0, 0))
 
-        # Main Body
-        pygame.draw.ellipse(
-            self.image,
-            (120, 120, 120),
-            (30, 45, 120, 40)
-        )
+        surf = self.base_image
+        w, h = self.width, self.height
+        body = (75, 85, 92)
+        body_dark = (50, 58, 64)
+        panel = (95, 105, 112)
+        glass = (150, 200, 220)
+        glass_dark = (110, 150, 170)
+        metal = (35, 35, 35)
 
-        # Cockpit
-        pygame.draw.ellipse(
-            self.image,
-            (190, 190, 210),
-            (95, 48, 50, 32)
-        )
+        fuselage = pygame.Rect(int(w * 0.16), int(h * 0.44), int(w * 0.56), int(h * 0.30))
+        pygame.draw.ellipse(surf, body, fuselage)
+        pygame.draw.ellipse(surf, body_dark, pygame.Rect(fuselage.x + 8, fuselage.y + 10, fuselage.w - 18, fuselage.h - 16))
 
-        # Frame cockpit
-        pygame.draw.ellipse(
-            self.image,
-            (90, 90, 90),
-            (95, 48, 50, 32),
-            2
-        )
+        nose = [
+            (int(w * 0.62), int(h * 0.48)),
+            (int(w * 0.78), int(h * 0.56)),
+            (int(w * 0.62), int(h * 0.74)),
+        ]
+        pygame.draw.polygon(surf, body, nose)
+        pygame.draw.polygon(surf, body_dark, [(nose[0][0] - 6, nose[0][1] + 6), (nose[1][0] - 10, nose[1][1] + 6), (nose[2][0] - 6, nose[2][1] - 6)])
 
-        # Tail boom
-        pygame.draw.rect(
-            self.image,
-            (100, 100, 100),
-            (145, 58, 55, 10)
-        )
+        cockpit = [
+            (int(w * 0.56), int(h * 0.50)),
+            (int(w * 0.73), int(h * 0.56)),
+            (int(w * 0.69), int(h * 0.70)),
+            (int(w * 0.54), int(h * 0.66)),
+        ]
+        pygame.draw.polygon(surf, glass, cockpit)
+        pygame.draw.polygon(surf, glass_dark, [(p[0], p[1] + 5) for p in cockpit])
+        pygame.draw.polygon(surf, metal, cockpit, 2)
 
-        # Main rotor
-        cx, cy = 100, 30
-        length = 90
-        angle = self.rotor_angle
+        tail = pygame.Rect(int(w * 0.02), int(h * 0.56), int(w * 0.26), int(h * 0.10))
+        pygame.draw.rect(surf, body, tail, border_radius=4)
+        pygame.draw.rect(surf, body_dark, (tail.x + 8, tail.y + 3, tail.w - 12, tail.h - 6), border_radius=4)
 
-        x1 = cx + math.cos(angle) * length
-        y1 = cy + math.sin(angle) * length
-        x2 = cx - math.cos(angle) * length
-        y2 = cy - math.sin(angle) * length
+        fin = [
+            (int(w * 0.06), int(h * 0.56)),
+            (int(w * 0.12), int(h * 0.36)),
+            (int(w * 0.16), int(h * 0.58)),
+        ]
+        pygame.draw.polygon(surf, panel, fin)
 
-        pygame.draw.line(
-            self.image,
-            (30, 30, 30),
-            (x1, y1),
-            (x2, y2),
-            8
-        )
+        skid_col = (40, 40, 40)
+        pygame.draw.rect(surf, skid_col, (int(w * 0.24), int(h * 0.76), int(w * 0.44), 6), border_radius=3)
+        pygame.draw.rect(surf, skid_col, (int(w * 0.20), int(h * 0.70), 6, int(h * 0.12)))
+        pygame.draw.rect(surf, skid_col, (int(w * 0.62), int(h * 0.70), 6, int(h * 0.12)))
 
-        # Second rotor blade
-        x3 = cx + math.cos(angle + math.pi / 2) * length
-        y3 = cy + math.sin(angle + math.pi / 2) * length
-        x4 = cx - math.cos(angle + math.pi / 2) * length
-        y4 = cy - math.sin(angle + math.pi / 2) * length
+        pod = pygame.Rect(int(w * 0.34), int(h * 0.70), int(w * 0.16), int(h * 0.10))
+        pygame.draw.rect(surf, (80, 60, 60), pod, border_radius=6)
+        for i in range(3):
+            pygame.draw.circle(surf, (140, 55, 55), (pod.x + 10 + i * 12, pod.centery), 4)
 
-        pygame.draw.line(
-            self.image,
-            (40, 40, 40),
-            (x3, y3),
-            (x4, y4),
-            6
-        )
+        mast = pygame.Rect(int(w * 0.40), int(h * 0.30), int(w * 0.06), int(h * 0.16))
+        pygame.draw.rect(surf, metal, mast, border_radius=3)
 
-        # Rotor hub
-        pygame.draw.circle(self.image, (60, 60, 60), (cx, cy), 8)
+        cx, cy = int(w * 0.43), int(h * 0.28)
+        if self.crashing:
+            pygame.draw.circle(surf, (0, 0, 0, 50), (cx, cy), int(w * 0.20))
+            pygame.draw.circle(surf, metal, (cx, cy), 10)
+        else:
+            length = int(w * 0.30)
+            angle = self.rotor_angle
+            for i in range(3):
+                a = angle + (i * math.pi / 3)
+                x1 = cx + math.cos(a) * length
+                y1 = cy + math.sin(a) * length
+                x2 = cx - math.cos(a) * length
+                y2 = cy - math.sin(a) * length
+                pygame.draw.line(surf, metal, (x1, y1), (x2, y2), 6)
+            pygame.draw.circle(surf, (70, 70, 70), (cx, cy), 10)
 
-        # Tail rotor
-        pygame.draw.line(
-            self.image,
-            (50, 50, 50),
-            (188, 63),
-            (198, 63),
-            5
-        )
-
-        pygame.draw.circle(self.image, (60, 60, 60), (193, 63), 4)
+        tr_x, tr_y = int(w * 0.02), int(h * 0.61)
+        pygame.draw.circle(surf, (30, 30, 30), (tr_x, tr_y), 10)
+        pygame.draw.line(surf, (60, 60, 60), (tr_x - 8, tr_y), (tr_x + 8, tr_y), 3)
+        pygame.draw.line(surf, (60, 60, 60), (tr_x, tr_y - 8), (tr_x, tr_y + 8), 3)
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
+        if self.crashing:
+            self.vel_y += (GRAVITY * 1.4) * DT
+            self.pos_y += self.vel_y * DT
+            self.pos_x += self.crash_vx * DT
+            self.crash_angle += self.crash_spin * DT
+
+            self.rect.x = int(self.pos_x)
+            self.rect.y = int(self.pos_y)
+
+            hits = pygame.sprite.spritecollide(self, platforms, False)
+            ground_hits = [p for p in hits if getattr(p.rect, 'height', 0) >= 160]
+            if ground_hits and self.vel_y > 0:
+                ground = min(ground_hits, key=lambda p: p.rect.top)
+                self.rect.bottom = ground.rect.top
+                self.pos_y = float(self.rect.y)
+                self.crash_impact = True
+                self.crash_impact_pos = (self.rect.centerx, self.rect.centery)
+
+            self.rotor_angle += 0.12 * DT
+            self.draw_helicopter()
+            center = self.rect.center
+            rotated = pygame.transform.rotate(self.base_image, self.crash_angle)
+            self.image = rotated
+            self.rect = self.image.get_rect(center=center)
+            self.check_bounds()
+            return
+
+        self.facing = 1 if player.rect.centerx >= self.rect.centerx else -1
 
         # Up and down motion
         self.phase += 0.05 * DT
         self.rect.y = self.start_y + math.sin(self.phase) * 30
+        self.pos_y = float(self.rect.y)
 
         # Follow player
         if self.rect.x < player.rect.x - 200:
@@ -335,6 +506,8 @@ class Helicopter(Enemy):
         # Rotor Spin
         self.rotor_angle += 0.4 * DT
         self.draw_helicopter()
+
+        self.image = self.base_image
 
         # Shooting
         self.shoot_timer += 1 * DT

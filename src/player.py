@@ -1,7 +1,7 @@
 import pygame
 from settings import *
 from .projectiles import Bullet, Grenade
-from .effects import MeleeEffect
+from .effects import MeleeEffect, SoldierDeath
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, game_ref):
@@ -118,6 +118,10 @@ class Player(pygame.sprite.Sprite):
                 add_score_callback(50) 
                 
                 if e.hp <= 0:
+                    if e.type_name == 'soldier':
+                        death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
+                        all_sprites.add(death)
+                        effects_group.add(death)
                     spawn_loot_callback(e) 
                     add_score_callback(e.score_val) # Kill Bonus
                     e.kill()

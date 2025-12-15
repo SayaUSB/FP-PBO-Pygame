@@ -176,7 +176,15 @@ class Game:
                 e.hp -= EXPLOSION_DAMAGE
                 self.add_score(e.hit_score) 
             if e.hp <= 0:
-                if e.type_name == 'tank' or e.type_name == 'heli':
+                if e.type_name == 'soldier':
+                    death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
+                    self.all_sprites.add(death)
+                    self.effects.add(death)
+                if e.type_name == 'heli':
+                    if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
+                        e.begin_crash()
+                    continue
+                if e.type_name == 'tank':
                     expl = Explosion(e.rect.centerx, e.rect.centery)
                     self.all_sprites.add(expl)
                     self.effects.add(expl)
@@ -298,6 +306,16 @@ class Game:
                 e.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, 
                         missiles_group=self.missiles, grenades_group=self.enemy_grenades, bullet_img=self.heli_bullet_img)
 
+        for e in list(self.enemies):
+            if getattr(e, 'type_name', None) == 'heli' and getattr(e, 'crashing', False) and getattr(e, 'crash_impact', False):
+                impact_pos = getattr(e, 'crash_impact_pos', None) or (e.rect.centerx, e.rect.centery)
+                expl = Explosion(impact_pos[0], impact_pos[1])
+                self.all_sprites.add(expl)
+                self.effects.add(expl)
+                self.spawn_loot(e)
+                self.add_score(e.score_val)
+                e.kill()
+
         for b in self.boss_group:
             b.update(self.platforms, self.player, self.enemy_bullets, self.all_sprites, 
                     missiles_group=self.missiles, grenades_group=self.enemy_grenades)
@@ -310,7 +328,15 @@ class Game:
                 self.add_score(e.hit_score) 
             
             if e.hp <= 0:
-                if e.type_name == 'tank' or e.type_name == 'heli':
+                if e.type_name == 'soldier':
+                    death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
+                    self.all_sprites.add(death)
+                    self.effects.add(death)
+                if e.type_name == 'heli':
+                    if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
+                        e.begin_crash()
+                    continue
+                if e.type_name == 'tank':
                     expl = Explosion(e.rect.centerx, e.rect.centery)
                     self.all_sprites.add(expl)
                     self.effects.add(expl)
