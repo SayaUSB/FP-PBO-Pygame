@@ -1,6 +1,6 @@
 import pygame
 from settings import *
-from .projectiles import Bullet, Grenade
+from .projectiles import Bullet, Grenade, Rocket
 from .effects import MeleeEffect, SoldierDeath
 
 class Player(pygame.sprite.Sprite):
@@ -231,12 +231,50 @@ class Player(pygame.sprite.Sprite):
             grenades.add(g)
             self.grenade_cd = self.max_grenade_cd 
 
-        if keys[pygame.K_f] and self.weapon_type == "hmg" and not self.is_shielding:
+        if keys[pygame.K_f] and self.weapon_type in ("hmg", "rocket") and not self.is_shielding:
             if self.shoot_delay <= 0:
                 self.fire_bullet(bullets, all_sprites)
-                self.shoot_delay = 5
+                self.shoot_delay = 5 if self.weapon_type == "hmg" else 18
 
     def fire_bullet(self, bullets, all_sprites):
+        if self.weapon_type == "rocket":
+            target = None
+            best_d = None
+            try:
+                for e in getattr(self.game_ref, 'enemies', []):
+                    if getattr(e, 'hp', 1) <= 0:
+                        continue
+                    dx = e.rect.centerx - self.rect.centerx
+                    dy = e.rect.centery - self.rect.centery
+                    d = dx * dx + dy * dy
+                    if best_d is None or d < best_d:
+                        best_d = d
+                        target = e
+                for e in getattr(self.game_ref, 'boss_group', []):
+                    if getattr(e, 'hp', 1) <= 0:
+                        continue
+                    dx = e.rect.centerx - self.rect.centerx
+                    dy = e.rect.centery - self.rect.centery
+                    d = dx * dx + dy * dy
+                    if best_d is None or d < best_d:
+                        best_d = d
+                        target = e
+            except Exception:
+                target = None
+
+            r = Rocket(self.rect.centerx, self.rect.centery, target=target, dx=self.facing, dy=0)
+            all_sprites.add(r)
+            if hasattr(self.game_ref, 'rockets'):
+                self.game_ref.rockets.add(r)
+            self.shoot_pose = 'side'
+            self.shoot_anim_timer = 10
+
+            self.ammo -= 1
+            if self.ammo <= 0:
+                self.weapon_type = "pistol"
+                self.ammo = 0
+            return
+
         keys = pygame.key.get_pressed()
         dx, dy = self.facing, 0
         if keys[pygame.K_UP]: 

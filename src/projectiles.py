@@ -129,6 +129,111 @@ class Missile(pygame.sprite.Sprite):
         if self.rect.x < -200 or self.rect.x > 100000:
             self.kill()
 
+class Rocket(pygame.sprite.Sprite):
+    def __init__(self, x, y, target=None, dx=1, dy=0):
+        super().__init__()
+        self.base_image = pygame.Surface((28, 12), pygame.SRCALPHA)
+        body = (95, 100, 110)
+        body_dark = (55, 60, 70)
+        tip = (220, 70, 70)
+        fin = (80, 85, 95)
+
+        pygame.draw.rect(self.base_image, body, (6, 2, 16, 8), border_radius=3)
+        pygame.draw.rect(self.base_image, body_dark, (7, 5, 13, 3), border_radius=2)
+        pygame.draw.polygon(self.base_image, tip, [(22, 2), (28, 6), (22, 10)])
+        pygame.draw.polygon(self.base_image, fin, [(10, 2), (6, 0), (12, 2)])
+        pygame.draw.polygon(self.base_image, fin, [(10, 10), (6, 12), (12, 10)])
+
+        self.image = self.base_image
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.target = target
+        self.speed = 26.0
+        self.damage = 120
+
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+
+        self.timer = 0
+        self.tracking_limit = 200
+        self.fuel_limit = 260
+
+        self.vel_x = float(dx)
+        self.vel_y = float(dy)
+        self.flame_phase = 0.0
+        self.explode_now = False
+        self.did_explode = False
+
+    def update(self, platforms=None):
+        self.timer += 1 * DT
+        self.flame_phase += 0.35 * DT
+
+        desired_x = self.vel_x
+        desired_y = self.vel_y
+
+        if self.timer < self.tracking_limit and self.target is not None and getattr(self.target, 'rect', None) is not None:
+            dx = self.target.rect.centerx - self.rect.centerx
+            dy = self.target.rect.centery - self.rect.centery
+            ang = math.atan2(dy, dx)
+            desired_x = math.cos(ang)
+            desired_y = math.sin(ang)
+
+        if platforms is not None:
+            mag = math.hypot(desired_x, desired_y)
+            if mag > 0:
+                nx = desired_x / mag
+                ny = desired_y / mag
+            else:
+                nx = 1.0
+                ny = 0.0
+
+            look = 90
+            ahead = pygame.Rect(
+                int(self.pos_x + nx * look - 30),
+                int(self.pos_y + ny * look - 20),
+                60,
+                40,
+            )
+
+            if pygame.sprite.spritecollideany(self, platforms, collided=lambda s, p: ahead.colliderect(p.rect)):
+                desired_y -= 1.15
+                desired_x += 0.10 * (1 if nx >= 0 else -1)
+
+        steer = 0.22
+        self.vel_x = (1.0 - steer) * self.vel_x + steer * desired_x
+        self.vel_y = (1.0 - steer) * self.vel_y + steer * desired_y
+
+        mag = math.hypot(self.vel_x, self.vel_y)
+        if mag > 0:
+            vx = (self.vel_x / mag) * self.speed
+            vy = (self.vel_y / mag) * self.speed
+        else:
+            vx = self.speed
+            vy = 0.0
+
+        self.pos_x += vx * DT
+        self.pos_y += vy * DT
+        self.rect.centerx = int(self.pos_x)
+        self.rect.centery = int(self.pos_y)
+
+        angle_deg = -math.degrees(math.atan2(vy, vx)) if (vx != 0 or vy != 0) else 0
+        flame_len = 9 + int(4 * math.sin(self.flame_phase))
+        flame = pygame.Surface(self.base_image.get_size(), pygame.SRCALPHA)
+        flame.blit(self.base_image, (0, 0))
+        pygame.draw.polygon(flame, (255, 170, 60, 200), [(6, 6), (max(0, 6 - flame_len), 2), (max(0, 6 - flame_len), 10)])
+        pygame.draw.polygon(flame, (255, 240, 200, 150), [(6, 6), (max(0, 6 - (flame_len // 2)), 4), (max(0, 6 - (flame_len // 2)), 8)])
+
+        self.image = pygame.transform.rotate(flame, angle_deg)
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+        if self.timer >= self.fuel_limit:
+            self.explode_now = True
+
+        if self.rect.right < -300 or self.rect.left > 100000:
+            self.kill()
+        if self.rect.top > SCREEN_HEIGHT + 400 or self.rect.bottom < -600:
+            self.kill()
+
 class Grenade(pygame.sprite.Sprite):
     def __init__(self, x, y, direction, is_enemy=False, miss_callback=None):
         super().__init__()

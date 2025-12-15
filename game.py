@@ -212,6 +212,7 @@ class Game:
         self.game_state = "playing"
         self.battle_lock = False
         self.hmg_pickup_msg_timer = 0
+        self.rl_pickup_msg_timer = 0
 
         self.boss_cooldown = 0 
         
@@ -223,6 +224,7 @@ class Game:
         self.bullets       = pygame.sprite.Group()
         self.enemy_bullets = pygame.sprite.Group()
         self.missiles      = pygame.sprite.Group()
+        self.rockets       = pygame.sprite.Group()
         self.enemies       = pygame.sprite.Group()
         self.boss_group    = pygame.sprite.Group() 
         self.grenades      = pygame.sprite.Group()
@@ -318,8 +320,11 @@ class Game:
         if enemy.type_name == 'boss_heli':
             for _ in range(3):
                 offset = random.randint(-30, 30)
-                if random.random() < 0.5:
+                roll = random.random()
+                if roll < 0.34:
                     item = MachineGunPickup(enemy.rect.centerx + offset, enemy.rect.centery)
+                elif roll < 0.68:
+                    item = RocketLauncherPickup(enemy.rect.centerx + offset, enemy.rect.centery)
                 else:
                     item = HealthPack(enemy.rect.centerx + offset, enemy.rect.centery)
                 self.items.add(item)
@@ -332,7 +337,10 @@ class Game:
                 self.all_sprites.add(item)
         elif enemy.type_name in ['tank', 'heli']:
             if random.random() < 0.25:
-                item = MachineGunPickup(enemy.rect.centerx, enemy.rect.centery)
+                if random.random() < 0.55:
+                    item = MachineGunPickup(enemy.rect.centerx, enemy.rect.centery)
+                else:
+                    item = RocketLauncherPickup(enemy.rect.centerx, enemy.rect.centery)
                 self.items.add(item)
                 self.all_sprites.add(item)
 
@@ -379,6 +387,54 @@ class Game:
                     self.boss_cooldown = 10**6
 
         grenade.kill()
+
+    def trigger_rocket_explosion(self, rocket):
+        if getattr(rocket, 'did_explode', False):
+            return
+        rocket.did_explode = True
+
+        expl = Explosion(rocket.rect.centerx, rocket.rect.centery)
+        self.all_sprites.add(expl)
+        self.effects.add(expl)
+        EXPLOSION_RADIUS = 300
+        EXPLOSION_DAMAGE = 120
+
+        for e in self.enemies:
+            dist = math.hypot(e.rect.centerx - rocket.rect.centerx, e.rect.centery - rocket.rect.centery)
+            if dist < EXPLOSION_RADIUS:
+                e.hp -= EXPLOSION_DAMAGE
+                self.add_score(e.hit_score)
+            if e.hp <= 0:
+                if e.type_name in ('soldier', 'paratrooper'):
+                    death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
+                    self.all_sprites.add(death)
+                    self.effects.add(death)
+                if e.type_name == 'heli':
+                    if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
+                        e.begin_crash()
+                    continue
+                if e.type_name == 'tank':
+                    expl = Explosion(e.rect.centerx, e.rect.centery)
+                    self.all_sprites.add(expl)
+                    self.effects.add(expl)
+                self.spawn_loot(e)
+                self.add_score(e.score_val)
+                e.kill()
+
+        for b in self.boss_group:
+            dist = math.hypot(b.rect.centerx - rocket.rect.centerx, b.rect.centery - rocket.rect.centery)
+            if dist < EXPLOSION_RADIUS:
+                b.hp -= EXPLOSION_DAMAGE
+                self.add_score(b.hit_score)
+                if b.hp <= 0:
+                    self.spawn_loot(b)
+                    self.add_score(b.score_val)
+                    b.kill()
+                    self.boss_fight_active = False
+                    self.next_boss_score += 10**5
+                    self.boss_cooldown = 10**6
+
+        rocket.kill()
 
     def update(self):
         if self.game_state in ("menu", "paused"):
@@ -438,6 +494,10 @@ class Game:
                 self.all_sprites.add(expl)
                 self.effects.add(expl)
                 m.kill()
+        self.rockets.update(self.platforms)
+        for r in list(self.rockets):
+            if getattr(r, 'explode_now', False):
+                self.trigger_rocket_explosion(r)
         self.items.update(self.platforms)
         self.effects.update()
 
@@ -545,6 +605,11 @@ class Game:
                 self.spawn_loot(e)
                 self.add_score(e.score_val)
                 e.kill()
+
+        rocket_hits = pygame.sprite.groupcollide(self.enemies, self.rockets, False, False)
+        for e, r_list in rocket_hits.items():
+            for r in r_list:
+                self.trigger_rocket_explosion(r)
         
         # vs boss
         boss_hits = pygame.sprite.groupcollide(self.boss_group, self.bullets, False, True)
@@ -558,8 +623,13 @@ class Game:
                 self.add_score(boss_enemy.score_val)
                 boss_enemy.kill()                
                 self.boss_fight_active = False
-                self.next_boss_score += 5*10**4
+                self.next_boss_score += 10**5
                 self.boss_cooldown = 10**6
+
+        boss_rocket_hits = pygame.sprite.groupcollide(self.boss_group, self.rockets, False, False)
+        for boss_enemy, rocket_list in boss_rocket_hits.items():
+            for r in rocket_list:
+                self.trigger_rocket_explosion(r)
         
         # missile vs bullet
         missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True)
@@ -567,6 +637,11 @@ class Game:
             expl = MediumExplosion(m.rect.centerx, m.rect.centery)
             self.all_sprites.add(expl)
             self.effects.add(expl)
+
+        # rockets vs platforms
+        rocket_ground_hits = pygame.sprite.groupcollide(self.rockets, self.platforms, False, False)
+        for r in rocket_ground_hits.keys():
+            self.trigger_rocket_explosion(r)
 
         # player vs enemy bullet / missile
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
@@ -595,6 +670,10 @@ class Game:
                 self.player.weapon_type = "hmg"
                 self.player.ammo += 100
                 self.hmg_pickup_msg_timer = 60
+            elif item.type_name == 'rl':
+                self.player.weapon_type = "rocket"
+                self.player.ammo += 18
+                self.rl_pickup_msg_timer = 60
 
         # game over
         if self.player.hp <= 0:
@@ -612,6 +691,9 @@ class Game:
         # timer
         if self.hmg_pickup_msg_timer > 0:
             self.hmg_pickup_msg_timer -= 1 * DT
+
+        if self.rl_pickup_msg_timer > 0:
+            self.rl_pickup_msg_timer -= 1 * DT
             
         if self.boss_cooldown > 0:
             self.boss_cooldown -= 1 * DT
@@ -817,11 +899,14 @@ class Game:
             if self.player.weapon_type == "hmg":
                 w_txt = f"MACHINE GUN ({self.player.ammo})"
                 w_col = GOLD
+            elif self.player.weapon_type == "rocket":
+                w_txt = f"ROCKET LAUNCHER ({self.player.ammo})"
+                w_col = (255, 0, 0)
             
             txt_weapon = self.font.render(w_txt, True, w_col)
             self.screen.blit(txt_weapon, (10, 70))
             
-            txt_info = self.font.render("F: Shoot (Hold for MG) | C: Shield | G: Grenade", True, GREY)
+            txt_info = self.font.render("F: Shoot (Hold for MG/RL) | C: Shield | G: Grenade", True, GREY)
             self.screen.blit(txt_info, (220, 10))
 
             # Boss bar
@@ -847,6 +932,10 @@ class Game:
             # pickup msg
             if self.hmg_pickup_msg_timer > 0:
                 msg = self.big_font.render("HEAVY MACHINE GUN!", True, GOLD)
+                self.screen.blit(msg, (SCREEN_WIDTH//2 - 200, SCREEN_HEIGHT//2 - 50))
+
+            if self.rl_pickup_msg_timer > 0:
+                msg = self.big_font.render("ROCKET LAUNCHER!", True, (120, 200, 240))
                 self.screen.blit(msg, (SCREEN_WIDTH//2 - 200, SCREEN_HEIGHT//2 - 50))
 
         if self.game_state == "game_over":

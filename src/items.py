@@ -40,3 +40,19 @@ class MachineGunPickup(Item):
         font = pygame.font.SysFont("Arial", 20, bold=True)
         txt = font.render("M", True, BLACK)
         self.image.blit(txt, (5, 2))
+
+class RocketLauncherPickup(Item):
+    def __init__(self, x, y):
+        super().__init__(x, y, (120, 170, 210), 'rl')
+        body = (40, 60, 70)
+        body_dark = (25, 35, 45)
+        tip = (210, 60, 60)
+        steel = (90, 95, 105)
+        flame = (255, 170, 60)
+
+        pygame.draw.rect(self.image, body, (5, 12, 15, 7), border_radius=3)
+        pygame.draw.rect(self.image, body_dark, (7, 15, 11, 3), border_radius=2)
+        pygame.draw.polygon(self.image, tip, [(20, 12), (24, 15), (20, 19)])
+        pygame.draw.rect(self.image, steel, (6, 9, 6, 4), border_radius=2)
+        pygame.draw.rect(self.image, (20, 20, 25), (10, 18, 7, 4), border_radius=2)
+        pygame.draw.polygon(self.image, (*flame, 200), [(5, 15), (2, 13), (2, 17)])
