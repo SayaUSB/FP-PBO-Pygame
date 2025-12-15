@@ -97,7 +97,6 @@ class Player(pygame.sprite.Sprite):
             self.ammo -= 1
             if self.ammo <= 0:
                 self.weapon_type = "pistol"
-                print("WEAPON: PISTOL")
 
     def check_auto_melee(self, enemies, all_sprites, effects_group, spawn_loot_callback, add_score_callback):
         if self.melee_cd > 0 or self.is_shielding:
