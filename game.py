@@ -57,7 +57,7 @@ class Game:
 
     def new_game(self):
         self.boss_fight_active = False
-        self.next_boss_score = 10000
+        self.next_boss_score = 10**5
         
         self.score = 0
         self.game_state = "playing"
@@ -193,7 +193,7 @@ class Game:
                     self.add_score(b.score_val)
                     b.kill()
                     self.boss_fight_active = False 
-                    self.next_boss_score += 10000
+                    self.next_boss_score += 10**5
                     self.boss_cooldown = 10**6
 
         grenade.kill()
@@ -329,7 +329,7 @@ class Game:
                 self.add_score(boss_enemy.score_val)
                 boss_enemy.kill()                
                 self.boss_fight_active = False
-                self.next_boss_score += 10000
+                self.next_boss_score += 10**5
                 self.boss_cooldown = 10**6
         
         # missile vs bullet
