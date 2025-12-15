@@ -1,6 +1,7 @@
 import pygame, random, math
 from settings import *
 from .projectiles import Bullet, Missile, Grenade
+from .items import HealthPack
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, color, hp, type_name, score_val, hit_score):
@@ -359,31 +360,154 @@ class Helicopter(Enemy):
             self.shoot_timer = 0
 
 class BossHelicopter(Enemy):
+    """Boss helicopter with varied attacks """
+    
     def __init__(self, x, y):
         super().__init__(x, y, PURPLE, 5000, 'boss_heli', 10000, 100)
-        self.image = pygame.Surface((200, 100))
-        self.image.fill(PURPLE)
-        pygame.draw.rect(self.image, DARK_GREEN, (10, 10, 180, 80))
-        pygame.draw.rect(self.image, RED, (50, 40, 20, 20))
+        sky_height = SCREEN_HEIGHT - 200
+        self.height = max(120, int(sky_height * 0.75))
+        self.width = max(200, int(self.height * 2.4))
+        self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
+        self.min_center_y = self.height // 2
+        self.max_center_y = max(self.min_center_y, sky_height - (self.height // 2))
+        clamped_y = max(self.min_center_y, min(int(y), self.max_center_y))
+        self.rect.center = (x, clamped_y)
         self.pos_x = float(x)
-        self.pos_y = float(y)
-        
-        self.start_y = y
+        self.pos_y = float(clamped_y)
+        self.start_y = clamped_y
         self.phase = 0
-        self.state = "move"
-        self.state_timer = 0
         self.attack_cooldown = 0
+        self.state_timer = 0
+        self.max_hp = 5000
+        self.rotor_angle = 0
         
-    def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
+        # Track HP thresholds for health pack drops (75%, 50%, 25%)
+        self.hp_thresholds = [0.75, 0.50, 0.25]
+        self.dropped_at_threshold = [False, False, False]
+        
+        # Attack pattern tracking
+        self.attack_pattern = 0
+        self.burst_count = 0
+        self.sweep_angle = 0
+        self.carpet_bomb_count = 0
+        
+        self.draw_boss_helicopter()
+    
+    def draw_boss_helicopter(self):
+        """Draw a massive military helicopter."""
+        self.image.fill((0, 0, 0, 0))
+
+        w = self.width
+        h = self.height
+        body_color = (70, 85, 75)
+        shade_color = (45, 55, 50)
+        panel_color = (95, 110, 100)
+        dark = (20, 20, 20)
+
+        fuselage = pygame.Rect(int(w * 0.12), int(h * 0.35), int(w * 0.75), int(h * 0.28))
+        pygame.draw.ellipse(self.image, body_color, fuselage)
+
+        nose = [
+            (int(w * 0.82), int(h * 0.38)),
+            (int(w * 0.95), int(h * 0.47)),
+            (int(w * 0.82), int(h * 0.60)),
+        ]
+        pygame.draw.polygon(self.image, body_color, nose)
+
+        pygame.draw.ellipse(
+            self.image,
+            shade_color,
+            pygame.Rect(int(w * 0.18), int(h * 0.40), int(w * 0.58), int(h * 0.18))
+        )
+
+        wing = [
+            (int(w * 0.36), int(h * 0.47)),
+            (int(w * 0.18), int(h * 0.24)),
+            (int(w * 0.52), int(h * 0.40)),
+            (int(w * 0.62), int(h * 0.47)),
+        ]
+        pygame.draw.polygon(self.image, panel_color, wing)
+        pygame.draw.polygon(self.image, shade_color, [(p[0], p[1] + int(h * 0.03)) for p in wing])
+
+        wing2 = [
+            (int(w * 0.36), int(h * 0.53)),
+            (int(w * 0.18), int(h * 0.76)),
+            (int(w * 0.52), int(h * 0.60)),
+            (int(w * 0.62), int(h * 0.53)),
+        ]
+        pygame.draw.polygon(self.image, panel_color, wing2)
+        pygame.draw.polygon(self.image, shade_color, [(p[0], p[1] - int(h * 0.03)) for p in wing2])
+
+        tail = pygame.Rect(int(w * 0.06), int(h * 0.42), int(w * 0.18), int(h * 0.14))
+        pygame.draw.rect(self.image, body_color, tail)
+
+        v_fin = [
+            (int(w * 0.08), int(h * 0.42)),
+            (int(w * 0.14), int(h * 0.24)),
+            (int(w * 0.18), int(h * 0.42)),
+        ]
+        pygame.draw.polygon(self.image, panel_color, v_fin)
+
+        h_tail_top = [
+            (int(w * 0.10), int(h * 0.44)),
+            (int(w * 0.00), int(h * 0.34)),
+            (int(w * 0.16), int(h * 0.40)),
+        ]
+        pygame.draw.polygon(self.image, panel_color, h_tail_top)
+
+        h_tail_bottom = [
+            (int(w * 0.10), int(h * 0.54)),
+            (int(w * 0.00), int(h * 0.66)),
+            (int(w * 0.16), int(h * 0.60)),
+        ]
+        pygame.draw.polygon(self.image, panel_color, h_tail_bottom)
+
+        cockpit = [
+            (int(w * 0.70), int(h * 0.37)),
+            (int(w * 0.82), int(h * 0.40)),
+            (int(w * 0.84), int(h * 0.48)),
+            (int(w * 0.72), int(h * 0.48)),
+        ]
+        pygame.draw.polygon(self.image, (120, 135, 125), cockpit)
+        pygame.draw.polygon(self.image, (150, 200, 220), [
+            (int(w * 0.73), int(h * 0.39)),
+            (int(w * 0.81), int(h * 0.41)),
+            (int(w * 0.82), int(h * 0.46)),
+            (int(w * 0.74), int(h * 0.46)),
+        ])
+
+        engine1 = pygame.Rect(int(w * 0.44), int(h * 0.54), int(w * 0.09), int(h * 0.10))
+        engine2 = pygame.Rect(int(w * 0.44), int(h * 0.36), int(w * 0.09), int(h * 0.10))
+        pygame.draw.ellipse(self.image, shade_color, engine1)
+        pygame.draw.ellipse(self.image, shade_color, engine2)
+        pygame.draw.circle(self.image, dark, (engine1.right - int(w * 0.01), engine1.centery), int(h * 0.03))
+        pygame.draw.circle(self.image, dark, (engine2.right - int(w * 0.01), engine2.centery), int(h * 0.03))
+
+        gun = pygame.Rect(int(w * 0.88), int(h * 0.52), int(w * 0.10), int(h * 0.02))
+        pygame.draw.rect(self.image, dark, gun)
+
+        for i in range(6):
+            x = int(w * (0.22 + i * 0.085))
+            pygame.draw.line(self.image, shade_color, (x, int(h * 0.40)), (x, int(h * 0.58)), 2)
+    
+    def check_hp_threshold_drop(self, all_sprites, items_group):
+        """Check if HP crossed a threshold and drop health pack."""
+        current_hp_pct = self.hp / self.max_hp
+        for i, threshold in enumerate(self.hp_thresholds):
+            if current_hp_pct <= threshold and not self.dropped_at_threshold[i]:
+                self.dropped_at_threshold[i] = True
+                hp_pack = HealthPack(self.rect.centerx, self.rect.centery + 50)
+                all_sprites.add(hp_pack)
+                items_group.add(hp_pack)
+    
+    def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None, items_group=None):
         self.phase += 0.03 * DT
         hover_offset = math.sin(self.phase) * 50
         
         self.state_timer += 1 * DT
         
-        dist_x = player.rect.centerx - self.rect.centerx
-        
+        # Follow player horizontally
         target_x = player.rect.centerx 
         if self.pos_x < target_x - 100:
             self.pos_x += 3 * DT
@@ -391,14 +515,37 @@ class BossHelicopter(Enemy):
             self.pos_x -= 3 * DT
             
         self.rect.centerx = int(self.pos_x)
-        self.rect.centery = int(self.start_y + hover_offset)
+        target_y = int(self.start_y + hover_offset)
+        self.rect.centery = max(self.min_center_y, min(target_y, self.max_center_y))
+
+        self.rotor_angle += 0.15 * DT
+        self.draw_boss_helicopter()
+        
+        # Check HP threshold for health pack drops
+        if items_group is not None:
+            self.check_hp_threshold_drop(all_sprites, items_group)
         
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1 * DT
         else:
-            attack_roll = random.choice(['mg', 'missile', 'bomb'])
+            # Varied attack patterns based on HP percentage
+            hp_pct = self.hp / self.max_hp
             
-            if attack_roll == 'mg':
+            if hp_pct > 0.75:
+                # Phase 1: Basic attacks
+                attack_roll = random.choice(['mg_burst', 'missile', 'bomb'])
+            elif hp_pct > 0.50:
+                # Phase 2: More aggressive
+                attack_roll = random.choice(['mg_sweep', 'missile_barrage', 'carpet_bomb', 'mg_burst'])
+            elif hp_pct > 0.25:
+                # Phase 3: Desperate attacks
+                attack_roll = random.choice(['mg_sweep', 'missile_barrage', 'carpet_bomb', 'combo_attack'])
+            else:
+                # Phase 4: Rage mode - all attacks faster
+                attack_roll = random.choice(['rage_mg', 'rage_missiles', 'carpet_bomb', 'combo_attack'])
+            
+            if attack_roll == 'mg_burst':
+                # Standard burst fire
                 for i in range(5):
                     spread = random.uniform(-0.2, 0.2)
                     dx = player.rect.centerx - self.rect.centerx
@@ -406,21 +553,97 @@ class BossHelicopter(Enemy):
                     angle = math.atan2(dy, dx) + spread
                     vx = math.cos(angle)
                     vy = math.sin(angle)
-                    b = Bullet(self.rect.centerx, self.rect.bottom, vx, vy, damage=15, is_enemy=True)
+                    b = Bullet(self.rect.centerx, self.rect.bottom, vx, vy, damage=15, is_enemy=True, bullet_img=bullet_img)
                     bullets.add(b)
                     all_sprites.add(b)
-                self.attack_cooldown = 60 
+                self.attack_cooldown = 60
+                
+            elif attack_roll == 'mg_sweep':
+                # Sweeping machine gun fire
+                for i in range(8):
+                    angle = -0.5 + (i * 0.15)
+                    dx = player.rect.centerx - self.rect.centerx
+                    dy = player.rect.centery - self.rect.centery
+                    base_angle = math.atan2(dy, dx)
+                    vx = math.cos(base_angle + angle)
+                    vy = math.sin(base_angle + angle)
+                    b = Bullet(self.rect.centerx, self.rect.bottom, vx, vy, damage=12, is_enemy=True, bullet_img=bullet_img)
+                    bullets.add(b)
+                    all_sprites.add(b)
+                self.attack_cooldown = 80
                 
             elif attack_roll == 'missile':
+                # Standard missile attack
                 for i in range(3):
                     offset_x = (i - 1) * 40
                     m = Missile(self.rect.centerx + offset_x, self.rect.centery, player)
                     all_sprites.add(m)
                     missiles_group.add(m)
-                self.attack_cooldown = 180 
+                self.attack_cooldown = 180
+                
+            elif attack_roll == 'missile_barrage':
+                # Heavy missile barrage
+                for i in range(5):
+                    offset_x = (i - 2) * 30
+                    m = Missile(self.rect.centerx + offset_x, self.rect.centery, player)
+                    all_sprites.add(m)
+                    missiles_group.add(m)
+                self.attack_cooldown = 200
                 
             elif attack_roll == 'bomb':
+                # Single bomb drop
                 g = Grenade(self.rect.centerx, self.rect.bottom, 0, is_enemy=True)
                 all_sprites.add(g)
                 grenades_group.add(g)
-                self.attack_cooldown = 40 
+                self.attack_cooldown = 40
+                
+            elif attack_roll == 'carpet_bomb':
+                # Carpet bombing - multiple bombs in a line
+                for i in range(5):
+                    offset_x = (i - 2) * 50
+                    g = Grenade(self.rect.centerx + offset_x, self.rect.bottom, 0, is_enemy=True)
+                    all_sprites.add(g)
+                    grenades_group.add(g)
+                self.attack_cooldown = 120
+                
+            elif attack_roll == 'combo_attack':
+                # Combined attack: missiles + bullets
+                for i in range(2):
+                    offset_x = (i * 2 - 1) * 50
+                    m = Missile(self.rect.centerx + offset_x, self.rect.centery, player)
+                    all_sprites.add(m)
+                    missiles_group.add(m)
+                for i in range(4):
+                    spread = random.uniform(-0.3, 0.3)
+                    dx = player.rect.centerx - self.rect.centerx
+                    dy = player.rect.centery - self.rect.centery
+                    angle = math.atan2(dy, dx) + spread
+                    vx = math.cos(angle)
+                    vy = math.sin(angle)
+                    b = Bullet(self.rect.centerx, self.rect.bottom, vx, vy, damage=15, is_enemy=True, bullet_img=bullet_img)
+                    bullets.add(b)
+                    all_sprites.add(b)
+                self.attack_cooldown = 150
+                
+            elif attack_roll == 'rage_mg':
+                # Rage mode: faster, more bullets
+                for i in range(10):
+                    spread = random.uniform(-0.4, 0.4)
+                    dx = player.rect.centerx - self.rect.centerx
+                    dy = player.rect.centery - self.rect.centery
+                    angle = math.atan2(dy, dx) + spread
+                    vx = math.cos(angle)
+                    vy = math.sin(angle)
+                    b = Bullet(self.rect.centerx, self.rect.bottom, vx, vy, damage=18, is_enemy=True, bullet_img=bullet_img)
+                    bullets.add(b)
+                    all_sprites.add(b)
+                self.attack_cooldown = 40
+                
+            elif attack_roll == 'rage_missiles':
+                # Rage mode: more missiles, faster cooldown
+                for i in range(4):
+                    offset_x = (i - 1.5) * 35
+                    m = Missile(self.rect.centerx + offset_x, self.rect.centery, player)
+                    all_sprites.add(m)
+                    missiles_group.add(m)
+                self.attack_cooldown = 100
