@@ -365,13 +365,16 @@ class BossHelicopter(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, PURPLE, 5000, 'boss_heli', 10000, 100)
         sky_height = SCREEN_HEIGHT - 200
-        self.height = max(120, int(sky_height * 0.75))
-        self.width = max(200, int(self.height * 2.4))
-        self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        base_height = max(120, int(sky_height * 0.75))
+        base_width = max(200, int(base_height * 2.4))
+        self.width = base_width
+        self.height = base_height
+        self.base_image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self.image = self.base_image
         self.rect = self.image.get_rect()
-        self.min_center_y = self.height // 2
-        self.max_center_y = max(self.min_center_y, sky_height - (self.height // 2))
-        clamped_y = max(self.min_center_y, min(int(y), self.max_center_y))
+        min_center_y = self.height // 2
+        max_center_y = max(min_center_y, sky_height - (self.height // 2))
+        clamped_y = max(min_center_y, min(int(y), max_center_y))
         self.rect.center = (x, clamped_y)
         self.pos_x = float(x)
         self.pos_y = float(clamped_y)
@@ -393,10 +396,25 @@ class BossHelicopter(Enemy):
         self.carpet_bomb_count = 0
         
         self.draw_boss_helicopter()
+
+        sky_height = SCREEN_HEIGHT - 200
+        self.min_center_y = self.rect.height // 2
+        self.max_center_y = max(self.min_center_y, sky_height - (self.rect.height // 2))
+        self.rect.centery = max(self.min_center_y, min(self.rect.centery, self.max_center_y))
+        self.pos_y = float(self.rect.centery)
+        self.start_y = self.rect.centery
     
+    def _trim_to_alpha(self):
+        bbox = self.base_image.get_bounding_rect()
+        if bbox.width <= 0 or bbox.height <= 0:
+            return
+        center = self.rect.center
+        self.image = self.base_image.subsurface(bbox).copy()
+        self.rect = self.image.get_rect(center=center)
+
     def draw_boss_helicopter(self):
         """Draw a massive military helicopter."""
-        self.image.fill((0, 0, 0, 0))
+        self.base_image.fill((0, 0, 0, 0))
 
         w = self.width
         h = self.height
@@ -405,18 +423,20 @@ class BossHelicopter(Enemy):
         panel_color = (95, 110, 100)
         dark = (20, 20, 20)
 
+        surf = self.base_image
+
         fuselage = pygame.Rect(int(w * 0.12), int(h * 0.35), int(w * 0.75), int(h * 0.28))
-        pygame.draw.ellipse(self.image, body_color, fuselage)
+        pygame.draw.ellipse(surf, body_color, fuselage)
 
         nose = [
             (int(w * 0.82), int(h * 0.38)),
             (int(w * 0.95), int(h * 0.47)),
             (int(w * 0.82), int(h * 0.60)),
         ]
-        pygame.draw.polygon(self.image, body_color, nose)
+        pygame.draw.polygon(surf, body_color, nose)
 
         pygame.draw.ellipse(
-            self.image,
+            surf,
             shade_color,
             pygame.Rect(int(w * 0.18), int(h * 0.40), int(w * 0.58), int(h * 0.18))
         )
@@ -427,8 +447,8 @@ class BossHelicopter(Enemy):
             (int(w * 0.52), int(h * 0.40)),
             (int(w * 0.62), int(h * 0.47)),
         ]
-        pygame.draw.polygon(self.image, panel_color, wing)
-        pygame.draw.polygon(self.image, shade_color, [(p[0], p[1] + int(h * 0.03)) for p in wing])
+        pygame.draw.polygon(surf, panel_color, wing)
+        pygame.draw.polygon(surf, shade_color, [(p[0], p[1] + int(h * 0.03)) for p in wing])
 
         wing2 = [
             (int(w * 0.36), int(h * 0.53)),
@@ -436,32 +456,32 @@ class BossHelicopter(Enemy):
             (int(w * 0.52), int(h * 0.60)),
             (int(w * 0.62), int(h * 0.53)),
         ]
-        pygame.draw.polygon(self.image, panel_color, wing2)
-        pygame.draw.polygon(self.image, shade_color, [(p[0], p[1] - int(h * 0.03)) for p in wing2])
+        pygame.draw.polygon(surf, panel_color, wing2)
+        pygame.draw.polygon(surf, shade_color, [(p[0], p[1] - int(h * 0.03)) for p in wing2])
 
         tail = pygame.Rect(int(w * 0.06), int(h * 0.42), int(w * 0.18), int(h * 0.14))
-        pygame.draw.rect(self.image, body_color, tail)
+        pygame.draw.rect(surf, body_color, tail)
 
         v_fin = [
             (int(w * 0.08), int(h * 0.42)),
             (int(w * 0.14), int(h * 0.24)),
             (int(w * 0.18), int(h * 0.42)),
         ]
-        pygame.draw.polygon(self.image, panel_color, v_fin)
+        pygame.draw.polygon(surf, panel_color, v_fin)
 
         h_tail_top = [
             (int(w * 0.10), int(h * 0.44)),
             (int(w * 0.00), int(h * 0.34)),
             (int(w * 0.16), int(h * 0.40)),
         ]
-        pygame.draw.polygon(self.image, panel_color, h_tail_top)
+        pygame.draw.polygon(surf, panel_color, h_tail_top)
 
         h_tail_bottom = [
             (int(w * 0.10), int(h * 0.54)),
             (int(w * 0.00), int(h * 0.66)),
             (int(w * 0.16), int(h * 0.60)),
         ]
-        pygame.draw.polygon(self.image, panel_color, h_tail_bottom)
+        pygame.draw.polygon(surf, panel_color, h_tail_bottom)
 
         cockpit = [
             (int(w * 0.70), int(h * 0.37)),
@@ -469,8 +489,8 @@ class BossHelicopter(Enemy):
             (int(w * 0.84), int(h * 0.48)),
             (int(w * 0.72), int(h * 0.48)),
         ]
-        pygame.draw.polygon(self.image, (120, 135, 125), cockpit)
-        pygame.draw.polygon(self.image, (150, 200, 220), [
+        pygame.draw.polygon(surf, (120, 135, 125), cockpit)
+        pygame.draw.polygon(surf, (150, 200, 220), [
             (int(w * 0.73), int(h * 0.39)),
             (int(w * 0.81), int(h * 0.41)),
             (int(w * 0.82), int(h * 0.46)),
@@ -479,17 +499,19 @@ class BossHelicopter(Enemy):
 
         engine1 = pygame.Rect(int(w * 0.44), int(h * 0.54), int(w * 0.09), int(h * 0.10))
         engine2 = pygame.Rect(int(w * 0.44), int(h * 0.36), int(w * 0.09), int(h * 0.10))
-        pygame.draw.ellipse(self.image, shade_color, engine1)
-        pygame.draw.ellipse(self.image, shade_color, engine2)
-        pygame.draw.circle(self.image, dark, (engine1.right - int(w * 0.01), engine1.centery), int(h * 0.03))
-        pygame.draw.circle(self.image, dark, (engine2.right - int(w * 0.01), engine2.centery), int(h * 0.03))
+        pygame.draw.ellipse(surf, shade_color, engine1)
+        pygame.draw.ellipse(surf, shade_color, engine2)
+        pygame.draw.circle(surf, dark, (engine1.right - int(w * 0.01), engine1.centery), int(h * 0.03))
+        pygame.draw.circle(surf, dark, (engine2.right - int(w * 0.01), engine2.centery), int(h * 0.03))
 
         gun = pygame.Rect(int(w * 0.88), int(h * 0.52), int(w * 0.10), int(h * 0.02))
-        pygame.draw.rect(self.image, dark, gun)
+        pygame.draw.rect(surf, dark, gun)
 
         for i in range(6):
             x = int(w * (0.22 + i * 0.085))
-            pygame.draw.line(self.image, shade_color, (x, int(h * 0.40)), (x, int(h * 0.58)), 2)
+            pygame.draw.line(surf, shade_color, (x, int(h * 0.40)), (x, int(h * 0.58)), 2)
+
+        self._trim_to_alpha()
     
     def check_hp_threshold_drop(self, all_sprites, items_group):
         """Check if HP crossed a threshold and drop health pack."""
@@ -517,9 +539,6 @@ class BossHelicopter(Enemy):
         self.rect.centerx = int(self.pos_x)
         target_y = int(self.start_y + hover_offset)
         self.rect.centery = max(self.min_center_y, min(target_y, self.max_center_y))
-
-        self.rotor_angle += 0.15 * DT
-        self.draw_boss_helicopter()
         
         # Check HP threshold for health pack drops
         if items_group is not None:
