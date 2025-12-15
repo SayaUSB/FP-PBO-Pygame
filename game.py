@@ -159,15 +159,15 @@ class Game:
             if dist < EXPLOSION_RADIUS:
                 e.hp -= EXPLOSION_DAMAGE
                 self.add_score(e.hit_score) 
-                if e.hp <= 0:
-                    if e.type_name == 'tank':
-                        expl = Explosion(e.rect.centerx, e.rect.centery)
-                        self.all_sprites.add(expl)
-                        self.effects.add(expl)
-                    self.spawn_loot(e)
-                    self.add_score(e.score_val)
-                    e.kill()
-        
+            if e.hp <= 0:
+                if e.type_name == 'tank' or e.type_name == 'heli':
+                    expl = Explosion(e.rect.centerx, e.rect.centery)
+                    self.all_sprites.add(expl)
+                    self.effects.add(expl)
+                self.spawn_loot(e)
+                self.add_score(e.score_val)
+                e.kill()
+    
         for b in self.boss_group:
             dist = math.hypot(b.rect.centerx - grenade.rect.centerx, b.rect.centery - grenade.rect.centery)
             if dist < EXPLOSION_RADIUS:
@@ -287,7 +287,11 @@ class Game:
                 e.hp -= b.damage
                 self.add_score(e.hit_score) 
             
-            if e.hp <= 0: 
+            if e.hp <= 0:
+                if e.type_name == 'tank' or e.type_name == 'heli':
+                    expl = Explosion(e.rect.centerx, e.rect.centery)
+                    self.all_sprites.add(expl)
+                    self.effects.add(expl)
                 self.spawn_loot(e)
                 self.add_score(e.score_val)
                 e.kill()
@@ -328,7 +332,7 @@ class Game:
                 self.player.hp = min(self.player.max_hp, self.player.hp + 30)
             elif item.type_name == 'mg':
                 self.player.weapon_type = "hmg"
-                self.player.ammo = 100
+                self.player.ammo += 100
                 self.hmg_pickup_msg_timer = 60
 
         # game over
