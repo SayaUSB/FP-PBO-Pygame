@@ -24,6 +24,21 @@ class Game:
 
         self.highscore = self.load_high_score()
         self.new_game()
+        self.trees = []
+        self.next_tree_x = 0
+
+    def spawn_tree_near_player(self):
+        spacing = random.randint(220, 360)
+        self.next_tree_x += spacing
+
+        ground_y = SCREEN_HEIGHT - 200
+
+        tree = {
+            "x": self.next_tree_x,
+            "y": ground_y,
+            "size": random.uniform(0.8, 1.25)
+        }
+        self.trees.append(tree)
 
     def load_high_score(self):
         filename = "highscore.txt"
@@ -233,6 +248,12 @@ class Game:
         self.missiles.update() 
         self.items.update(self.platforms)
         self.effects.update()
+
+        spawn_limit = self.player.pos_x + SCREEN_WIDTH * 1.5
+
+        while self.next_tree_x < spawn_limit:
+            self.spawn_tree_near_player()
+
         
         # grenade explosions
         for g in self.grenades:
@@ -436,12 +457,10 @@ class Game:
         self.screen.fill(SKY_BLUE)
 
         # Background decorations (world-space -> screen-space via camera_x)
-        ground_y = SCREEN_HEIGHT - 200
-        tree_base_y = ground_y
-        for wx, size in [(200, 1.0), (650, 0.9), (1100, 1.2), (1650, 1.0), (2150, 0.85)]:
-            sx = int(wx - self.camera_x)
-            if -200 <= sx <= SCREEN_WIDTH + 200:
-                self.draw_tree(sx, tree_base_y, size=size)
+        for t in self.trees:
+            sx = int(t["x"] - self.camera_x)
+            if -300 <= sx <= SCREEN_WIDTH + 300:
+                self.draw_tree(sx, t["y"], t["size"])
 
         for s in self.all_sprites:
             off_x = s.rect.x - int(self.camera_x)
