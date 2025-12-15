@@ -36,6 +36,53 @@ class Explosion(pygame.sprite.Sprite):
         if self.timer <= 0:
             self.kill()
 
+class MediumExplosion(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.radius = 10
+        self.max_radius = 80
+        self.growth_rate = 10
+        self.pos_x = x
+        self.pos_y = y
+        self.image = pygame.Surface((self.max_radius * 2, self.max_radius * 2), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.alpha = 235
+        self.timer = 16
+
+    def update(self):
+        self.timer -= 1 * DT
+
+        if self.radius < self.max_radius:
+            self.radius += self.growth_rate * DT
+
+        if self.timer < 8:
+            self.alpha -= 28 * DT
+            if self.alpha < 0:
+                self.alpha = 0
+
+        self.image.fill((0, 0, 0, 0))
+        pygame.draw.circle(
+            self.image,
+            (*ORANGE, int(self.alpha)),
+            (self.max_radius, self.max_radius),
+            int(self.radius)
+        )
+        pygame.draw.circle(
+            self.image,
+            (*YELLOW, int(self.alpha)),
+            (self.max_radius, self.max_radius),
+            int(self.radius * 0.7)
+        )
+        pygame.draw.circle(
+            self.image,
+            (255, 255, 255, int(self.alpha * 0.6)),
+            (self.max_radius, self.max_radius),
+            int(self.radius * 0.35)
+        )
+
+        if self.timer <= 0:
+            self.kill()
+
 class MeleeEffect(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()

@@ -7,10 +7,24 @@ class Bullet(pygame.sprite.Sprite):
         if bullet_img:
             self.image = bullet_img
         else:
-            size = (14, 8) if is_hmg else (12, 12) 
             color = GOLD if is_hmg else (RED if is_enemy else YELLOW)
-            self.image = pygame.Surface(size)
-            self.image.fill(color)
+            dark = (max(0, color[0] - 60), max(0, color[1] - 60), max(0, color[2] - 60))
+            glow = (min(255, color[0] + 80), min(255, color[1] + 80), min(255, color[2] + 80))
+
+            w, h = ((20, 8) if is_hmg else (16, 6))
+            self.original_image = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.rect(self.original_image, (*glow, 140), (0, 1, w - 2, h - 2), border_radius=3)
+            pygame.draw.rect(self.original_image, color, (2, 1, w - 6, h - 2), border_radius=3)
+            pygame.draw.polygon(self.original_image, color, [(w - 6, 1), (w, h // 2), (w - 6, h - 1)])
+            pygame.draw.rect(self.original_image, dark, (2, 1, w - 6, h - 2), 2, border_radius=3)
+            pygame.draw.polygon(self.original_image, dark, [(w - 6, 1), (w, h // 2), (w - 6, h - 1)], 2)
+
+            if dx == 0 and dy == 0:
+                angle_deg = 0
+            else:
+                angle_deg = -math.degrees(math.atan2(dy, dx))
+
+            self.image = pygame.transform.rotate(self.original_image, angle_deg)
             
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
@@ -47,10 +61,19 @@ class Bullet(pygame.sprite.Sprite):
 class Missile(pygame.sprite.Sprite):
     def __init__(self, x, y, target):
         super().__init__()
-        self.original_image = pygame.Surface((24, 12), pygame.SRCALPHA)
-        pygame.draw.polygon(self.original_image, CYAN, [(0,0), (24,6), (0,12)])
-        pygame.draw.circle(self.original_image, RED, (2, 6), 3) 
-        
+        self.original_image = pygame.Surface((34, 14), pygame.SRCALPHA)
+        body = (80, 170, 190)
+        body_dark = (40, 110, 130)
+        tip = (210, 60, 60)
+        steel = (40, 40, 40)
+
+        pygame.draw.rect(self.original_image, body, (8, 3, 22, 8), border_radius=4)
+        pygame.draw.rect(self.original_image, body_dark, (10, 6, 18, 4), border_radius=3)
+        pygame.draw.polygon(self.original_image, tip, [(30, 3), (34, 7), (30, 11)])
+        pygame.draw.polygon(self.original_image, steel, [(14, 2), (18, 2), (16, 0)])
+        pygame.draw.polygon(self.original_image, steel, [(14, 12), (18, 12), (16, 14)])
+        pygame.draw.circle(self.original_image, (255, 220, 120), (12, 7), 2)
+
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
@@ -69,9 +92,11 @@ class Missile(pygame.sprite.Sprite):
         
         self.vel_x = 0
         self.vel_y = 0
+        self.flame_phase = 0
 
     def update(self):
         self.timer += 1 * DT
+        self.flame_phase += 0.35 * DT
         
         if self.timer < self.tracking_limit:
             dx = self.target.rect.centerx - self.rect.centerx
@@ -81,8 +106,14 @@ class Missile(pygame.sprite.Sprite):
             
             self.vel_x = math.cos(angle_rad) * self.speed
             self.vel_y = math.sin(angle_rad) * self.speed
-            
-            self.image = pygame.transform.rotate(self.original_image, -angle_deg)
+
+            flame_len = 10 + int(4 * math.sin(self.flame_phase))
+            flame = pygame.Surface(self.original_image.get_size(), pygame.SRCALPHA)
+            flame.blit(self.original_image, (0, 0))
+            pygame.draw.polygon(flame, (255, 180, 50, 200), [(8, 7), (max(0, 8 - flame_len), 3), (max(0, 8 - flame_len), 11)])
+            pygame.draw.polygon(flame, (255, 240, 180, 160), [(8, 7), (max(0, 8 - (flame_len // 2)), 5), (max(0, 8 - (flame_len // 2)), 9)])
+
+            self.image = pygame.transform.rotate(flame, -angle_deg)
             self.rect = self.image.get_rect(center=self.rect.center)
 
         self.pos_x += self.vel_x * DT
@@ -100,10 +131,14 @@ class Missile(pygame.sprite.Sprite):
 class Grenade(pygame.sprite.Sprite):
     def __init__(self, x, y, direction, is_enemy=False, miss_callback=None):
         super().__init__()
-        self.image = pygame.Surface((16, 16))
         color = RED if is_enemy else ORANGE
-        self.image.fill(color)
-        pygame.draw.rect(self.image, WHITE, (4,4,8,8)) 
+        self.original_image = pygame.Surface((18, 18), pygame.SRCALPHA)
+        pygame.draw.circle(self.original_image, color, (9, 9), 8)
+        pygame.draw.circle(self.original_image, (255, 255, 255, 80), (7, 7), 4)
+        pygame.draw.circle(self.original_image, (30, 30, 30), (9, 9), 8, 2)
+        pygame.draw.rect(self.original_image, (220, 220, 220), (7, 1, 4, 4), border_radius=2)
+        pygame.draw.circle(self.original_image, (220, 220, 220), (9, 1), 2)
+        self.image = self.original_image
         
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
@@ -117,6 +152,8 @@ class Grenade(pygame.sprite.Sprite):
         self.explode_now = False
         self.is_enemy = is_enemy
         self.miss_callback = miss_callback # Grenade penalty miss
+        self.angle = 0
+        self.spin = (9 if is_enemy else 12) * direction
 
     def update(self):
         self.vel_y += GRAVITY * DT

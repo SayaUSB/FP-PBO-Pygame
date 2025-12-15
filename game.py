@@ -366,7 +366,11 @@ class Game:
                 self.boss_cooldown = 10**6
         
         # missile vs bullet
-        missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True) 
+        missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True)
+        for m in missile_hits.keys():
+            expl = MediumExplosion(m.rect.centerx, m.rect.centery)
+            self.all_sprites.add(expl)
+            self.effects.add(expl)
 
         # player vs enemy bullet / missile
         player_hit_list = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)

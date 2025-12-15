@@ -204,71 +204,76 @@ class Tank(Enemy):
     def draw_tank(self, player):
         self.image.fill((0, 0, 0, 0))
 
-        # Chains
-        pygame.draw.rect(
-            self.image,
-            (40, 40, 40),
-            (20, 90, 200, 36),
-            border_radius=18
-        )
+        base = (30, 30, 30)
+        steel = (80, 80, 80)
+        tread = (35, 35, 35)
+        tread_dark = (20, 20, 20)
+        armor = (25, 90, 35)
+        armor_dark = (18, 60, 24)
+        armor_light = (50, 140, 65)
+        warning = (200, 60, 60)
 
-        # Wheels
-        for i in range(8):
-            pygame.draw.circle(
-                self.image,
-                (90, 90, 90),
-                (40 + i * 22, 108),
-                12
-            )
+        pygame.draw.rect(self.image, tread, (14, 92, 212, 38), border_radius=18)
+        pygame.draw.rect(self.image, tread_dark, (18, 98, 204, 26), border_radius=14)
 
-        # Upper body
-        pygame.draw.rect(
-            self.image,
-            DARK_GREEN,
-            (35, 50, 170, 50),
-            border_radius=18
-        )
+        for i in range(9):
+            cx = 32 + i * 22
+            pygame.draw.circle(self.image, steel, (cx, 111), 12)
+            pygame.draw.circle(self.image, (55, 55, 55), (cx, 111), 7)
+            pygame.draw.circle(self.image, (25, 25, 25), (cx, 111), 3)
 
-        # Panel detail
-        pygame.draw.rect(
-            self.image,
-            (60, 120, 60),
-            (55, 60, 60, 30),
-            border_radius=8
-        )
+        pygame.draw.rect(self.image, tread_dark, (22, 102, 196, 4), border_radius=2)
+        pygame.draw.rect(self.image, tread_dark, (22, 116, 196, 4), border_radius=2)
 
-        # Turret Base
-        turret_base_center = (120, 50)
-        pygame.draw.circle(
-            self.image,
-            (70, 130, 70),
-            turret_base_center,
-            26
-        )
+        hull = pygame.Rect(28, 54, 184, 44)
+        pygame.draw.rect(self.image, armor, hull, border_radius=14)
+        pygame.draw.rect(self.image, armor_dark, (hull.x + 6, hull.y + 18, hull.w - 12, hull.h - 22), border_radius=12)
 
-        # Turret
+        glacis = [(40, 58), (120, 44), (192, 56), (170, 74), (52, 74)]
+        pygame.draw.polygon(self.image, armor_light, glacis)
+        pygame.draw.polygon(self.image, armor_dark, [(x, y + 6) for (x, y) in glacis])
+
+        for x in range(46, 200, 18):
+            pygame.draw.circle(self.image, (15, 35, 18), (x, 76), 2)
+            pygame.draw.circle(self.image, (15, 35, 18), (x, 92), 2)
+
+        vent = pygame.Rect(60, 62, 52, 18)
+        pygame.draw.rect(self.image, (18, 45, 22), vent, border_radius=4)
+        for i in range(5):
+            pygame.draw.line(self.image, (10, 20, 10), (vent.x + 6 + i * 9, vent.y + 4), (vent.x + 6 + i * 9, vent.y + vent.h - 4), 2)
+
+        pygame.draw.rect(self.image, warning, (150, 70, 38, 10), border_radius=3)
+        for i in range(4):
+            pygame.draw.line(self.image, (30, 30, 30), (152 + i * 9, 70), (152 + i * 9 - 6, 80), 2)
+
+        turret_base_center = (132, 54)
+        pygame.draw.circle(self.image, armor_dark, turret_base_center, 30)
+        pygame.draw.circle(self.image, armor, turret_base_center, 26)
+        pygame.draw.circle(self.image, (12, 30, 14), turret_base_center, 10)
+
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
         self.turret_angle = math.atan2(dy, dx)
 
-        barrel_length = 80
+        barrel_length = 94
         end_x = turret_base_center[0] + math.cos(self.turret_angle) * barrel_length
         end_y = turret_base_center[1] + math.sin(self.turret_angle) * barrel_length
+        mid_x = turret_base_center[0] + math.cos(self.turret_angle) * 34
+        mid_y = turret_base_center[1] + math.sin(self.turret_angle) * 34
 
-        pygame.draw.line(
-            self.image,
-            (30, 30, 30),
-            turret_base_center,
-            (end_x, end_y),
-            12
-        )
+        pygame.draw.line(self.image, base, turret_base_center, (end_x, end_y), 14)
+        pygame.draw.line(self.image, (55, 55, 55), turret_base_center, (end_x, end_y), 8)
+        pygame.draw.circle(self.image, (25, 25, 25), (int(mid_x), int(mid_y)), 9)
 
-        pygame.draw.circle(
-            self.image,
-            (20, 20, 20),
-            (int(end_x), int(end_y)),
-            6
-        )
+        brake_x = turret_base_center[0] + math.cos(self.turret_angle) * (barrel_length - 8)
+        brake_y = turret_base_center[1] + math.sin(self.turret_angle) * (barrel_length - 8)
+        perp = self.turret_angle + math.pi / 2
+        bx1 = brake_x + math.cos(perp) * 8
+        by1 = brake_y + math.sin(perp) * 8
+        bx2 = brake_x - math.cos(perp) * 8
+        by2 = brake_y - math.sin(perp) * 8
+        pygame.draw.line(self.image, (20, 20, 20), (bx1, by1), (bx2, by2), 4)
+        pygame.draw.circle(self.image, (10, 10, 10), (int(end_x), int(end_y)), 7)
 
     def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
         # Gravity
