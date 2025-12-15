@@ -429,7 +429,7 @@ class Game:
         self.screen.blit(restart_surf, restart_rect)
 
     def draw(self):
-        self.screen.fill(BLACK)
+        self.screen.fill(SKY_BLUE)
 
         # Background decorations (world-space -> screen-space via camera_x)
         ground_y = SCREEN_HEIGHT - 200
