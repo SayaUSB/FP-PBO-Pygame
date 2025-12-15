@@ -285,6 +285,12 @@ class Game:
         for g, plats in enemy_ground_hits.items():
             g.explode_now = True
 
+        enemy_bullet_ground_hits = pygame.sprite.groupcollide(self.enemy_bullets, self.platforms, True, False)
+        for b, plats in enemy_bullet_ground_hits.items():
+            expl = SmallExplosion(b.rect.centerx, b.rect.centery)
+            self.all_sprites.add(expl)
+            self.effects.add(expl)
+
         for g in self.enemy_grenades:
             if g.explode_now:
                 expl = Explosion(g.rect.centerx, g.rect.centery)

@@ -147,3 +147,44 @@ class SoldierDeath(pygame.sprite.Sprite):
                 pygame.draw.circle(self.image, (*blood, a), (px, py), 2)
 
         self.rect = self.image.get_rect(center=(int(self.pos_x), int(self.pos_y)))
+
+class SmallExplosion(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.radius = 6
+        self.max_radius = 40
+        self.growth_rate = 6
+        self.pos_x = x
+        self.pos_y = y
+        self.image = pygame.Surface((self.max_radius * 2, self.max_radius * 2), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.alpha = 220
+        self.timer = 12
+
+    def update(self):
+        self.timer -= 1 * DT
+
+        if self.radius < self.max_radius:
+            self.radius += self.growth_rate * DT
+
+        if self.timer < 6:
+            self.alpha -= 35 * DT
+            if self.alpha < 0:
+                self.alpha = 0
+
+        self.image.fill((0, 0, 0, 0))
+        pygame.draw.circle(
+            self.image,
+            (*ORANGE, int(self.alpha)),
+            (self.max_radius, self.max_radius),
+            int(self.radius)
+        )
+        pygame.draw.circle(
+            self.image,
+            (*YELLOW, int(self.alpha)),
+            (self.max_radius, self.max_radius),
+            int(self.radius * 0.65)
+        )
+
+        if self.timer <= 0:
+            self.kill()
