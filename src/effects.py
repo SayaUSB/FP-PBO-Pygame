@@ -195,6 +195,110 @@ class SoldierDeath(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(center=(int(self.pos_x), int(self.pos_y)))
 
+
+class PlayerDeath(pygame.sprite.Sprite):
+    def __init__(self, x, y, facing=1):
+        super().__init__()
+        self.base_w = 84
+        self.base_h = 84
+        self.image = pygame.Surface((self.base_w, self.base_h), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+
+        self.facing = 1 if facing >= 0 else -1
+        self.vel_x = 1.2 * self.facing
+        self.vel_y = -8.0
+        self.angle = -18 * self.facing
+        self.ang_vel = (-5.0 * self.facing) + random.uniform(-2.0, 2.0)
+        self.alpha = 255
+        self.timer = 40
+
+        self.particles = []
+        for _ in range(18):
+            vx = random.uniform(-3.4, 3.4)
+            vy = random.uniform(-6.5, -2.2)
+            life = random.randint(14, 28)
+            self.particles.append([0.0, 10.0, vx, vy, life])
+
+    def _draw_body(self):
+        surf = pygame.Surface((self.base_w, self.base_h), pygame.SRCALPHA)
+
+        suit = (55, 110, 210)
+        suit_dark = (35, 70, 150)
+        hair = (30, 20, 20)
+        skin = (220, 180, 140)
+        boots = (30, 30, 30)
+        gun = (25, 25, 25)
+        blood = (180, 30, 30)
+
+        cx = self.base_w // 2
+        cy = self.base_h // 2
+
+        pygame.draw.circle(surf, hair, (cx - 16, cy - 18), 10)
+        pygame.draw.circle(surf, skin, (cx - 14, cy - 16), 8)
+
+        torso = pygame.Rect(cx - 10, cy - 10, 30, 22)
+        pygame.draw.rect(surf, suit, torso, border_radius=6)
+        pygame.draw.rect(surf, suit_dark, (torso.x, torso.y + torso.h // 2, torso.w, torso.h // 2), border_radius=6)
+
+        pygame.draw.line(surf, suit, (cx + 10, cy - 2), (cx + 30, cy + 6), 6)
+        pygame.draw.line(surf, suit, (cx + 10, cy - 2), (cx + 24, cy - 18), 6)
+
+        pygame.draw.line(surf, suit, (cx + 2, cy + 12), (cx + 16, cy + 34), 8)
+        pygame.draw.line(surf, suit, (cx + 16, cy + 12), (cx + 36, cy + 34), 8)
+        pygame.draw.rect(surf, boots, (cx + 10, cy + 32, 16, 8), border_radius=2)
+        pygame.draw.rect(surf, boots, (cx + 30, cy + 32, 16, 8), border_radius=2)
+
+        pygame.draw.rect(surf, gun, (cx + 20, cy - 12, 22, 6), border_radius=2)
+        pygame.draw.rect(surf, (60, 60, 60), (cx + 24, cy - 11, 7, 4), border_radius=2)
+
+        pygame.draw.circle(surf, (*blood, 180), (cx - 4, cy + 18), 8)
+        pygame.draw.circle(surf, (*blood, 150), (cx + 6, cy + 22), 6)
+
+        return surf
+
+    def update(self):
+        self.timer -= 1 * DT
+        if self.timer <= 0:
+            self.kill()
+            return
+
+        self.vel_y += (GRAVITY * 1.25) * DT
+        self.pos_x += self.vel_x * DT
+        self.pos_y += self.vel_y * DT
+        self.angle += self.ang_vel * DT
+
+        if self.timer < 14:
+            self.alpha -= 18 * DT
+            if self.alpha < 0:
+                self.alpha = 0
+
+        for p in self.particles:
+            p[4] -= 1 * DT
+            p[2] *= 0.985
+            p[3] += (GRAVITY * 0.95) * DT
+            p[0] += p[2] * DT
+            p[1] += p[3] * DT
+
+        base = self._draw_body()
+        rotated = pygame.transform.rotate(base, self.angle)
+        rotated.set_alpha(int(self.alpha))
+        self.image = pygame.Surface((self.base_w, self.base_h), pygame.SRCALPHA)
+
+        r = rotated.get_rect(center=(self.base_w // 2, self.base_h // 2))
+        self.image.blit(rotated, r)
+
+        blood = (180, 30, 30)
+        for p in self.particles:
+            if p[4] > 0:
+                px = int(self.base_w // 2 + p[0])
+                py = int(self.base_h // 2 + p[1])
+                a = max(0, min(180, int(180 * (p[4] / 28))))
+                pygame.draw.circle(self.image, (*blood, a), (px, py), 2)
+
+        self.rect = self.image.get_rect(center=(int(self.pos_x), int(self.pos_y)))
+
 class SmallExplosion(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()

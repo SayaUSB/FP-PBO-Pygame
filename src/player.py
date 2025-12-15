@@ -7,8 +7,16 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, game_ref):
         super().__init__()
         self.game_ref = game_ref
-        self.image = pygame.Surface((30, 50))
-        self.image.fill(BLUE)
+        self.width = 44
+        self.height = 64
+        self.frames = self._build_frames()
+        self.aim_pose = 'side'
+        self.shoot_pose = 'side'
+        self.shoot_anim_timer = 0
+        self.walk_timer = 0
+        self.walk_index = 0
+
+        self.image = self.frames[1]['idle']
         self.rect = self.image.get_rect()
         self.rect.topleft = (100, 100)
         self.pos_x = 100.0
@@ -40,6 +48,146 @@ class Player(pygame.sprite.Sprite):
 
         self.hazard_iframes = 0
 
+    def _draw_player_frame(self, facing, pose, step=0):
+        w = self.width
+        h = self.height
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        skin = (220, 180, 140)
+        helmet = (50, 70, 95)
+        helmet_dark = (35, 50, 70)
+        visor = (140, 200, 220)
+        suit = (45, 110, 210)
+        suit_dark = (25, 70, 150)
+        suit_light = (90, 165, 245)
+        vest = (30, 45, 65)
+        vest_dark = (20, 30, 45)
+        backpack = (35, 35, 35)
+        backpack_dark = (25, 25, 25)
+        gloves = (22, 22, 22)
+        boots = (25, 25, 25)
+        gun = (20, 20, 20)
+        gun_dark = (70, 70, 70)
+
+        bob = 0
+        leg = 0
+        arm = 0
+        if pose == 'run':
+            bob = [0, -1, 0, 1][step % 4]
+            leg = [-2, 1, 2, -1][step % 4]
+            arm = [1, -1, 0, 0][step % 4]
+
+        head_r = 8
+        head = (int(w * 0.40), int(h * 0.18) + bob)
+        pygame.draw.circle(surf, skin, head, head_r)
+        pygame.draw.circle(surf, helmet, (head[0], head[1] - 2), head_r + 3)
+        pygame.draw.circle(surf, helmet_dark, (head[0] - 2, head[1] - 4), head_r + 3, 2)
+        pygame.draw.rect(surf, visor, (head[0] - 7, head[1] - 3, 14, 5), border_radius=2)
+        pygame.draw.circle(surf, (20, 20, 20), head, head_r + 2, 1)
+
+        torso = pygame.Rect(int(w * 0.26), int(h * 0.28) + bob, int(w * 0.34), int(h * 0.28))
+        pack = pygame.Rect(torso.x - 8, torso.y + 6, 10, int(torso.h * 0.75))
+        pygame.draw.rect(surf, backpack, pack, border_radius=3)
+        pygame.draw.rect(surf, backpack_dark, (pack.x, pack.y + pack.h // 2, pack.w, pack.h // 2), border_radius=3)
+
+        pygame.draw.rect(surf, suit, torso, border_radius=6)
+        pygame.draw.rect(surf, suit_dark, (torso.x, torso.y + torso.h // 2, torso.w, torso.h // 2), border_radius=6)
+        pygame.draw.rect(surf, suit_light, (torso.x + 4, torso.y + 4, torso.w - 8, 6), border_radius=3)
+
+        vest_rect = pygame.Rect(torso.x + 2, torso.y + 4, torso.w - 4, torso.h - 2)
+        pygame.draw.rect(surf, vest, vest_rect, border_radius=5)
+        pygame.draw.rect(surf, vest_dark, (vest_rect.x, vest_rect.y + vest_rect.h // 2, vest_rect.w, vest_rect.h // 2), border_radius=5)
+        pygame.draw.line(surf, (90, 95, 105), (vest_rect.centerx, vest_rect.y + 4), (vest_rect.centerx, vest_rect.bottom - 4), 2)
+        pygame.draw.circle(surf, (170, 170, 170), (vest_rect.centerx - 4, vest_rect.y + 10), 2)
+        pygame.draw.circle(surf, (170, 170, 170), (vest_rect.centerx + 4, vest_rect.y + 10), 2)
+
+        hip_y = int(h * 0.58) + bob
+        left_hip = (int(w * 0.34), hip_y)
+        right_hip = (int(w * 0.48), hip_y)
+        left_foot = (int(w * 0.30) + leg, int(h * 0.92))
+        right_foot = (int(w * 0.52) - leg, int(h * 0.92))
+        pygame.draw.line(surf, suit, left_hip, left_foot, 7)
+        pygame.draw.line(surf, suit, right_hip, right_foot, 7)
+        pygame.draw.rect(surf, boots, (left_foot[0] - 6, left_foot[1] - 3, 14, 7), border_radius=2)
+        pygame.draw.rect(surf, boots, (right_foot[0] - 6, right_foot[1] - 3, 14, 7), border_radius=2)
+
+        pygame.draw.circle(surf, vest_dark, (left_foot[0], int(h * 0.76) + bob), 4)
+        pygame.draw.circle(surf, vest_dark, (right_foot[0], int(h * 0.76) + bob), 4)
+
+        shoulder_y = int(h * 0.38) + bob
+        left_shoulder = (int(w * 0.30), shoulder_y)
+        right_shoulder = (int(w * 0.52), shoulder_y)
+
+        left_hand = (int(w * 0.22), int(h * 0.48) + bob + arm)
+        right_hand = (int(w * 0.66), int(h * 0.44) + bob - arm)
+
+        if pose.startswith('shoot'):
+            if pose == 'shoot_up':
+                right_hand = (int(w * 0.54), int(h * 0.22) + bob)
+            elif pose == 'shoot_down':
+                right_hand = (int(w * 0.54), int(h * 0.62) + bob)
+            elif pose == 'shoot_down_diag':
+                right_hand = (int(w * 0.66), int(h * 0.58) + bob)
+            else:
+                right_hand = (int(w * 0.66), int(h * 0.42) + bob)
+
+        pygame.draw.line(surf, suit, left_shoulder, left_hand, 6)
+        pygame.draw.line(surf, suit, right_shoulder, right_hand, 6)
+
+        pygame.draw.circle(surf, gloves, left_hand, 3)
+        pygame.draw.circle(surf, gloves, right_hand, 3)
+
+        if pose.startswith('shoot'):
+            if pose == 'shoot_up':
+                gun_rect = pygame.Rect(right_hand[0] - 4, right_hand[1] - 20, 8, 26)
+                pygame.draw.rect(surf, gun, gun_rect, border_radius=2)
+                pygame.draw.rect(surf, gun_dark, (gun_rect.x + 1, gun_rect.y + 4, gun_rect.w - 2, 6), border_radius=2)
+                pygame.draw.circle(surf, (255, 220, 80), (gun_rect.centerx, gun_rect.y - 2), 3)
+            elif pose == 'shoot_down':
+                gun_rect = pygame.Rect(right_hand[0] - 4, right_hand[1] - 2, 8, 26)
+                pygame.draw.rect(surf, gun, gun_rect, border_radius=2)
+                pygame.draw.rect(surf, gun_dark, (gun_rect.x + 1, gun_rect.y + 10, gun_rect.w - 2, 6), border_radius=2)
+                pygame.draw.circle(surf, (255, 220, 80), (gun_rect.centerx, gun_rect.bottom + 2), 3)
+            elif pose == 'shoot_down_diag':
+                pts = [(right_hand[0] - 2, right_hand[1] - 2), (right_hand[0] + 18, right_hand[1] + 12), (right_hand[0] + 14, right_hand[1] + 16), (right_hand[0] - 6, right_hand[1] + 2)]
+                pygame.draw.polygon(surf, gun, pts)
+                pygame.draw.polygon(surf, gun_dark, [(pts[0][0] + 1, pts[0][1] + 3), (pts[1][0] - 2, pts[1][1] + 2), (pts[2][0] - 2, pts[2][1] + 2), (pts[3][0] + 1, pts[3][1] + 2)])
+                pygame.draw.circle(surf, (255, 220, 80), (right_hand[0] + 20, right_hand[1] + 14), 3)
+            else:
+                gun_rect = pygame.Rect(int(w * 0.56), int(h * 0.41) + bob, int(w * 0.30), 6)
+                pygame.draw.rect(surf, gun, gun_rect, border_radius=2)
+                pygame.draw.rect(surf, gun_dark, (gun_rect.x + 6, gun_rect.y + 1, 9, 4), border_radius=2)
+                pygame.draw.circle(surf, (255, 220, 80), (gun_rect.right + 2, gun_rect.centery), 3)
+        else:
+            gun_rect = pygame.Rect(int(w * 0.56), int(h * 0.43) + bob, int(w * 0.26), 6)
+            pygame.draw.rect(surf, gun, gun_rect, border_radius=2)
+            pygame.draw.rect(surf, gun_dark, (gun_rect.x + 6, gun_rect.y + 1, 8, 4), border_radius=2)
+
+        if facing == -1:
+            surf = pygame.transform.flip(surf, True, False)
+        return surf
+
+    def _build_frames(self):
+        frames = {
+            1: {
+                'idle': self._draw_player_frame(1, 'idle', 0),
+                'run': [self._draw_player_frame(1, 'run', i) for i in range(4)],
+                'shoot_side': self._draw_player_frame(1, 'shoot_side', 0),
+                'shoot_up': self._draw_player_frame(1, 'shoot_up', 0),
+                'shoot_down': self._draw_player_frame(1, 'shoot_down', 0),
+                'shoot_down_diag': self._draw_player_frame(1, 'shoot_down_diag', 0),
+            },
+            -1: {
+                'idle': self._draw_player_frame(-1, 'idle', 0),
+                'run': [self._draw_player_frame(-1, 'run', i) for i in range(4)],
+                'shoot_side': self._draw_player_frame(-1, 'shoot_side', 0),
+                'shoot_up': self._draw_player_frame(-1, 'shoot_up', 0),
+                'shoot_down': self._draw_player_frame(-1, 'shoot_down', 0),
+                'shoot_down_diag': self._draw_player_frame(-1, 'shoot_down_diag', 0),
+            },
+        }
+        return frames
+
     def get_input(self, all_sprites, bullets, grenades, is_locked, camera_x):
         keys = pygame.key.get_pressed()
         
@@ -62,6 +210,16 @@ class Player(pygame.sprite.Sprite):
                 self.pos_x = right_boundary - self.rect.width
 
         self.rect.x = int(self.pos_x)
+
+        if keys[pygame.K_UP]:
+            self.aim_pose = 'up'
+        elif keys[pygame.K_DOWN] and not self.on_ground:
+            if keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
+                self.aim_pose = 'down_diag'
+            else:
+                self.aim_pose = 'down'
+        else:
+            self.aim_pose = 'side'
 
         if keys[pygame.K_SPACE] and self.on_ground:
             self.vel_y = self.jump_power
@@ -86,7 +244,27 @@ class Player(pygame.sprite.Sprite):
             dx = 0 if not (keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]) else dx
         elif keys[pygame.K_DOWN] and not self.on_ground: 
             dy = 1
-            dx = 0
+            if keys[pygame.K_LEFT]:
+                dx = -1
+            elif keys[pygame.K_RIGHT]:
+                dx = 1
+            else:
+                dx = 0
+
+        if dx != 0 and dy != 0:
+            inv = 1.0 / (2 ** 0.5)
+            dx *= inv
+            dy *= inv
+
+        if dy < 0:
+            self.shoot_pose = 'up'
+        elif dy > 0 and dx == 0:
+            self.shoot_pose = 'down'
+        elif dy > 0 and dx != 0:
+            self.shoot_pose = 'down_diag'
+        else:
+            self.shoot_pose = 'side'
+        self.shoot_anim_timer = 10
         
         is_hmg = (self.weapon_type == "hmg")
         dmg = 25 if is_hmg else 20
@@ -181,6 +359,31 @@ class Player(pygame.sprite.Sprite):
         if self.shoot_delay > 0: self.shoot_delay -= 1 * DT
         if self.melee_cd > 0: self.melee_cd -= 1 * DT
         if self.hazard_iframes > 0: self.hazard_iframes -= 1 * DT
+
+        if self.shoot_anim_timer > 0:
+            self.shoot_anim_timer -= 1 * DT
+
+        moving = pygame.key.get_pressed()[pygame.K_LEFT] or pygame.key.get_pressed()[pygame.K_RIGHT]
+        if moving:
+            self.walk_timer += 0.18 * DT
+            self.walk_index = int(self.walk_timer) % 4
+        else:
+            self.walk_timer = 0
+            self.walk_index = 0
+
+        if self.shoot_anim_timer > 0:
+            key = 'shoot_side'
+            if self.shoot_pose == 'up':
+                key = 'shoot_up'
+            elif self.shoot_pose == 'down':
+                key = 'shoot_down'
+            elif self.shoot_pose == 'down_diag':
+                key = 'shoot_down_diag'
+            self.image = self.frames[self.facing][key]
+        elif moving:
+            self.image = self.frames[self.facing]['run'][self.walk_index]
+        else:
+            self.image = self.frames[self.facing]['idle']
         
         # shield logic
         if self.is_shielding:

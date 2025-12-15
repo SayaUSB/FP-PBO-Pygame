@@ -196,6 +196,7 @@ class Game:
 
         self.player = Player(self) 
         self.all_sprites.add(self.player)
+        self.player_death_spawned = False
         
         self.camera_x = 0
         self.world_limit = 0
@@ -343,7 +344,11 @@ class Game:
         grenade.kill()
 
     def update(self):
-        if self.game_state in ("menu", "paused", "game_over"):
+        if self.game_state in ("menu", "paused"):
+            return
+
+        if self.game_state == "game_over":
+            self.effects.update()
             return
         
         current_x = self.player.rect.centerx
@@ -550,6 +555,12 @@ class Game:
 
         # game over
         if self.player.hp <= 0:
+            if not getattr(self, 'player_death_spawned', False):
+                death = PlayerDeath(self.player.rect.centerx, self.player.rect.centery, facing=getattr(self.player, 'facing', 1))
+                self.all_sprites.add(death)
+                self.effects.add(death)
+                self.player.kill()
+                self.player_death_spawned = True
             self.game_state = "game_over"
             if self.score > self.highscore:
                 self.highscore = self.score
