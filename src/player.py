@@ -38,6 +38,8 @@ class Player(pygame.sprite.Sprite):
         self.melee_range = 70 
         self.melee_dmg = 50   
 
+        self.hazard_iframes = 0
+
     def get_input(self, all_sprites, bullets, grenades, is_locked, camera_x):
         keys = pygame.key.get_pressed()
         
@@ -166,6 +168,10 @@ class Player(pygame.sprite.Sprite):
                 self.vel_y = 0
                 self.pos_y = float(self.rect.y)
 
+            if self.hazard_iframes <= 0 and getattr(p, 'damage', 0) > 0:
+                self.take_damage(getattr(p, 'damage', 0))
+                self.hazard_iframes = 30
+
         self.rect.x = int(self.pos_x)
 
         if self.rect.y > SCREEN_HEIGHT + 200: self.hp = 0 
@@ -174,6 +180,7 @@ class Player(pygame.sprite.Sprite):
         if self.grenade_cd > 0: self.grenade_cd -= 1 * DT
         if self.shoot_delay > 0: self.shoot_delay -= 1 * DT
         if self.melee_cd > 0: self.melee_cd -= 1 * DT
+        if self.hazard_iframes > 0: self.hazard_iframes -= 1 * DT
         
         # shield logic
         if self.is_shielding:

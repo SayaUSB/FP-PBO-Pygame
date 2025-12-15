@@ -121,8 +121,22 @@ class Game:
             obs_h = random.choice([40, 80, 110])
             obs_x = start_x + random.randint(100, width - 400) 
             obs_y = ground_y - obs_h
-            
-            p = Platform(obs_x, obs_y, obs_w, obs_h)
+
+            kind_roll = random.random()
+            if kind_roll < 0.22:
+                kind = "crate"
+            elif kind_roll < 0.42:
+                kind = "stone"
+            elif kind_roll < 0.58:
+                kind = "sandbag"
+            elif kind_roll < 0.72:
+                kind = "metal"
+            elif kind_roll < 0.87:
+                kind = "barrel"
+            else:
+                kind = "spikes"
+
+            p = Platform(obs_x, obs_y, obs_w, obs_h, kind=kind)
             self.platforms.add(p)
             self.all_sprites.add(p)
 
