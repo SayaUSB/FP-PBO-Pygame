@@ -24,6 +24,7 @@ class Game:
 
         self.highscore = self.load_high_score()
         self.new_game()
+        self.game_state = "menu"
         self.trees = []
         self.next_tree_x = 0
 
@@ -199,7 +200,7 @@ class Game:
         grenade.kill()
 
     def update(self):
-        if self.game_state == "game_over":
+        if self.game_state in ("menu", "paused", "game_over"):
             return
         
         current_x = self.player.rect.centerx
@@ -375,7 +376,25 @@ class Game:
             if event.type == pygame.QUIT: self.running = False
             
             if event.type == pygame.KEYDOWN:
-                if self.game_state == "playing":
+                if self.game_state == "menu":
+                    if event.key == pygame.K_RETURN:
+                        self.new_game()
+                    if event.key == pygame.K_ESCAPE:
+                        self.running = False
+
+                elif self.game_state == "paused":
+                    if event.key in (pygame.K_ESCAPE, pygame.K_p):
+                        self.game_state = "playing"
+                    if event.key == pygame.K_m:
+                        self.game_state = "menu"
+                    if event.key == pygame.K_r:
+                        self.new_game()
+
+                elif self.game_state == "playing":
+                    if event.key in (pygame.K_ESCAPE, pygame.K_p):
+                        self.game_state = "paused"
+                        continue
+
                     if event.key == pygame.K_f and self.player.weapon_type == "pistol" and not self.player.is_shielding:
                         self.player.fire_bullet(self.bullets, self.all_sprites)
                     if event.key == pygame.K_F1: 
@@ -387,6 +406,8 @@ class Game:
                         self.new_game()
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
+                    if event.key == pygame.K_m:
+                        self.game_state = "menu"
 
     def draw_tree(self, x, y, size=1.0):
         """Draw a simple tree silhouette.
@@ -453,6 +474,48 @@ class Game:
         restart_rect = restart_surf.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80))
         self.screen.blit(restart_surf, restart_rect)
 
+    def draw_menu_screen(self):
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill(SEMI_TRANSPARENT_BLACK)
+        self.screen.blit(overlay, (0, 0))
+
+        title_surf = self.title_font.render("METAL SLUG: CLONE", True, GOLD)
+        title_rect = title_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 160))
+        self.screen.blit(title_surf, title_rect)
+
+        hs_surf = self.font.render(f"Best Score: {self.highscore}", True, WHITE)
+        hs_rect = hs_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 80))
+        self.screen.blit(hs_surf, hs_rect)
+
+        start_surf = self.big_font.render("Press [ENTER] to Start", True, WHITE)
+        start_rect = start_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 10))
+        self.screen.blit(start_surf, start_rect)
+
+        info_surf = self.font.render("Press [ESC] to Quit", True, GREY)
+        info_rect = info_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 70))
+        self.screen.blit(info_surf, info_rect)
+
+    def draw_pause_screen(self):
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill(SEMI_TRANSPARENT_BLACK)
+        self.screen.blit(overlay, (0, 0))
+
+        title_surf = self.title_font.render("PAUSED", True, WHITE)
+        title_rect = title_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 110))
+        self.screen.blit(title_surf, title_rect)
+
+        resume_surf = self.big_font.render("[ESC]/[P] Resume", True, WHITE)
+        resume_rect = resume_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 10))
+        self.screen.blit(resume_surf, resume_rect)
+
+        restart_surf = self.big_font.render("[R] Restart", True, WHITE)
+        restart_rect = restart_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60))
+        self.screen.blit(restart_surf, restart_rect)
+
+        menu_surf = self.font.render("[M] Main Menu", True, GREY)
+        menu_rect = menu_surf.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 120))
+        self.screen.blit(menu_surf, menu_rect)
+
     def draw(self):
         self.screen.fill(SKY_BLUE)
 
@@ -469,7 +532,7 @@ class Game:
                 if isinstance(s, Player) and s.is_shielding:
                     pygame.draw.circle(self.screen, CYAN, (off_x + 15, s.rect.y + 25), 40, 2)
         
-        if self.game_state == "playing":
+        if self.game_state in ("playing", "paused"):
             # HP bar
             hp_pct = max(0, self.player.hp / self.player.max_hp)
             hp_col = (0, 255, 0) if hp_pct > 0.5 else (255, 0, 0)
@@ -541,6 +604,12 @@ class Game:
 
         if self.game_state == "game_over":
             self.draw_game_over_screen()
+
+        if self.game_state == "menu":
+            self.draw_menu_screen()
+
+        if self.game_state == "paused":
+            self.draw_pause_screen()
 
         pygame.display.flip()
 
