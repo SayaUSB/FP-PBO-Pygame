@@ -141,15 +141,19 @@ class Game:
             self.all_sprites.add(p)
 
             roll = random.random()
-            if roll < 0.4:
+            if roll < 0.25:
                 e = Soldier(obs_x + obs_w//2, obs_y - 10)
                 self.enemies.add(e)
                 self.all_sprites.add(e)
-            elif roll < 0.6:
+            elif roll < 0.70:
+                para = Paratrooper(self, obs_x + obs_w//2, 60)
+                self.enemies.add(para)
+                self.all_sprites.add(para)
+            elif roll < 0.82:
                 t = Tank(obs_x + 200, ground_y - 10)
                 self.enemies.add(t)
                 self.all_sprites.add(t)
-            elif roll < 0.8:
+            elif roll < 0.92:
                 h = Helicopter(obs_x, 150)
                 self.enemies.add(h)
                 self.all_sprites.add(h)

@@ -184,6 +184,129 @@ class Soldier(Enemy):
                 self.shoot_timer = 0
                 self.shoot_anim_timer = 10
 
+
+class Paratrooper(Enemy):
+    def __init__(self, game_ref, x, y):
+        super().__init__(x, y, PINK, 35, 'paratrooper', 180, 12)
+        self.game_ref = game_ref
+
+        self.width = 56
+        self.height = 96
+
+        self.facing = random.choice([-1, 1])
+        self.vel_y = 0.0
+        self.fall_gravity = GRAVITY * 0.22
+        self.max_fall_speed = 5.5
+        self.drift_speed = 0.35
+
+        self.shoot_timer = random.randint(0, 60)
+        self.shot_mode = 0
+
+        self.image = self._draw_paratrooper_frame(self.facing)
+        self.rect = self.image.get_rect(midtop=(x, y))
+        self.pos_x = float(self.rect.x)
+        self.pos_y = float(self.rect.y)
+
+    def _draw_paratrooper_frame(self, facing):
+        w = self.width
+        h = self.height
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        chute = (210, 210, 220)
+        chute_dark = (160, 160, 175)
+        cord = (70, 70, 70)
+        skin = (220, 180, 140)
+        uniform = (70, 110, 70)
+        uniform_dark = (45, 75, 45)
+        helmet = (55, 70, 60)
+        gun = (25, 25, 25)
+
+        canopy_rect = pygame.Rect(int(w * 0.08), 0, int(w * 0.84), int(h * 0.34))
+        pygame.draw.ellipse(surf, chute, canopy_rect)
+        pygame.draw.ellipse(surf, chute_dark, (canopy_rect.x + 8, canopy_rect.y + 10, canopy_rect.w - 16, canopy_rect.h - 18))
+        pygame.draw.ellipse(surf, (40, 40, 55), canopy_rect, 2)
+
+        harness_y = int(h * 0.44)
+        left_attach = (int(w * 0.28), int(h * 0.30))
+        right_attach = (int(w * 0.72), int(h * 0.30))
+        body_center = (int(w * 0.50), harness_y)
+        pygame.draw.line(surf, cord, left_attach, (body_center[0] - 10, body_center[1] - 8), 2)
+        pygame.draw.line(surf, cord, right_attach, (body_center[0] + 10, body_center[1] - 8), 2)
+        pygame.draw.line(surf, cord, (body_center[0] - 10, body_center[1] - 8), (body_center[0] - 16, body_center[1] + 8), 2)
+        pygame.draw.line(surf, cord, (body_center[0] + 10, body_center[1] - 8), (body_center[0] + 16, body_center[1] + 8), 2)
+
+        head_r = max(7, int(h * 0.08))
+        head_c = (int(w * 0.50), int(h * 0.42))
+        pygame.draw.circle(surf, skin, head_c, head_r)
+        pygame.draw.circle(surf, helmet, (head_c[0], head_c[1] - 1), head_r + 1)
+        pygame.draw.circle(surf, (35, 45, 40), (head_c[0] - 2, head_c[1] - 2), head_r + 1, 2)
+
+        torso = pygame.Rect(int(w * 0.34), int(h * 0.50), int(w * 0.32), int(h * 0.22))
+        pygame.draw.rect(surf, uniform, torso, border_radius=5)
+        pygame.draw.rect(surf, uniform_dark, (torso.x, torso.y + torso.h // 2, torso.w, torso.h // 2), border_radius=5)
+        pygame.draw.rect(surf, (60, 60, 60), (torso.x + 4, torso.y + 10, torso.w - 8, 6), border_radius=3)
+
+        leg_y1 = int(h * 0.74)
+        pygame.draw.line(surf, uniform, (int(w * 0.46), int(h * 0.70)), (int(w * 0.40), leg_y1), 6)
+        pygame.draw.line(surf, uniform, (int(w * 0.54), int(h * 0.70)), (int(w * 0.60), leg_y1), 6)
+        pygame.draw.rect(surf, (30, 30, 30), (int(w * 0.35), leg_y1 - 2, 14, 6), border_radius=2)
+        pygame.draw.rect(surf, (30, 30, 30), (int(w * 0.56), leg_y1 - 2, 14, 6), border_radius=2)
+
+        gun_w = int(w * 0.26)
+        gun_h = max(5, int(h * 0.05))
+        gun_x = int(w * 0.56)
+        gun_y = int(h * 0.58)
+        pygame.draw.rect(surf, gun, (gun_x, gun_y, gun_w, gun_h), border_radius=2)
+        pygame.draw.rect(surf, (60, 60, 60), (gun_x + 6, gun_y + 1, 10, gun_h - 2), border_radius=2)
+
+        if facing == -1:
+            surf = pygame.transform.flip(surf, True, False)
+        return surf
+
+    def update(self, platforms, player, bullets, all_sprites, missiles_group, grenades_group, bullet_img=None):
+        self.facing = 1 if player.rect.centerx >= self.rect.centerx else -1
+
+        self.vel_y += self.fall_gravity * DT
+        if self.vel_y > self.max_fall_speed:
+            self.vel_y = self.max_fall_speed
+        self.pos_y += self.vel_y * DT
+
+        drift_dir = self.facing
+        self.pos_x += (self.drift_speed * drift_dir) * DT
+
+        self.rect.x = int(self.pos_x)
+        self.rect.y = int(self.pos_y)
+
+        ground_hits = [p for p in pygame.sprite.spritecollide(self, platforms, False) if getattr(p, 'is_ground', False) or p.rect.height >= 160]
+        if ground_hits and self.vel_y > 0:
+            ground = min(ground_hits, key=lambda p: p.rect.top)
+            land_bottomleft = (self.rect.x, ground.rect.top)
+            s = Soldier(land_bottomleft[0], land_bottomleft[1])
+            self.game_ref.enemies.add(s)
+            all_sprites.add(s)
+            self.kill()
+            return
+
+        self.image = self._draw_paratrooper_frame(self.facing)
+        self.rect = self.image.get_rect(topleft=(self.rect.x, self.rect.y))
+        self.pos_x = float(self.rect.x)
+        self.pos_y = float(self.rect.y)
+
+        self.shoot_timer += 1 * DT
+        if self.shoot_timer > 75 and abs(player.rect.centerx - self.rect.centerx) < 1200:
+            inv = 1.0 / math.sqrt(2)
+            if self.shot_mode == 0:
+                b = Bullet(self.rect.centerx, self.rect.centery + 10, 0, 1, damage=10, is_enemy=True)
+                bullets.add(b)
+                all_sprites.add(b)
+                self.shot_mode = 1
+            else:
+                b = Bullet(self.rect.centerx, self.rect.centery + 10, self.facing * inv, inv, damage=10, is_enemy=True)
+                bullets.add(b)
+                all_sprites.add(b)
+                self.shot_mode = 0
+            self.shoot_timer = 0
+
 class Tank(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, DARK_GREEN, 120, 'tank', 300, 30)
