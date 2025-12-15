@@ -264,7 +264,8 @@ class Game:
                 self.enemies.add(e)
                 self.all_sprites.add(e)
             elif roll < 0.70:
-                para = Paratrooper(self, obs_x + obs_w//2, 60)
+                para_spawn_y = -random.randint(120, 360)
+                para = Paratrooper(self, obs_x + obs_w//2, para_spawn_y)
                 self.enemies.add(para)
                 self.all_sprites.add(para)
             elif roll < 0.82:
