@@ -1,7 +1,7 @@
 import pygame
 from settings import *
 from .projectiles import Bullet, Grenade
-from .effects   import MeleeEffect
+from .effects import MeleeEffect
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, game_ref):
@@ -103,6 +103,7 @@ class Player(pygame.sprite.Sprite):
             return
 
         for e in enemies:
+            if e.type_name == 'tank' or e.type_name == 'heli': continue
             dist_x = abs(self.rect.centerx - e.rect.centerx)
             dist_y = abs(self.rect.centery - e.rect.centery)
 
