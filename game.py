@@ -44,33 +44,48 @@ class Game:
 
         horizon_y = int(SCREEN_HEIGHT * 0.64)
         base_y = int(SCREEN_HEIGHT * 0.88)
+        step = 40
+        phase1 = rng.random() * math.tau
+        phase2 = rng.random() * math.tau
+        phase3 = rng.random() * math.tau
+        ridge = []
         x = 0
-        peaks = []
-        while x < mw + 200:
-            peak_w = rng.randint(260, 520)
-            peak_h = rng.randint(180, 420)
-            px = x + rng.randint(-40, 40)
-            py = horizon_y - peak_h
-            peaks.append((px, py, peak_w, peak_h))
-            x += int(peak_w * 0.65)
+        while x <= mw:
+            t = (x / mw) * math.tau
+            peak_h = (
+                220
+                + 150 * (0.5 + 0.5 * math.sin(t * 1 + phase1))
+                + 90 * (0.5 + 0.5 * math.sin(t * 2 + phase2))
+                + 55 * (0.5 + 0.5 * math.sin(t * 3 + phase3))
+            )
+            y = horizon_y - int(peak_h)
+            ridge.append((x, y))
+            x += step
 
         col1 = (90, 110, 150)
         col2 = (65, 85, 120)
         snow = (235, 245, 255)
         snow_shadow = (190, 210, 230)
 
-        for i, (px, py, peak_w, peak_h) in enumerate(peaks):
-            col = col1 if i % 2 == 0 else col2
-            left = (px, base_y)
-            top = (px + peak_w // 2, py)
-            right = (px + peak_w, base_y)
-            pygame.draw.polygon(mountain, col, [left, top, right])
-            pygame.draw.polygon(mountain, (max(0, col[0] - 18), max(0, col[1] - 18), max(0, col[2] - 18)), [(px + peak_w // 2, py), (px + int(peak_w * 0.72), base_y), right])
+        poly = ridge + [(mw, base_y), (0, base_y)]
+        pygame.draw.polygon(mountain, col1, poly)
+        shadow_ridge = [(x, min(base_y, y + 26)) for (x, y) in ridge]
+        pygame.draw.polygon(mountain, col2, shadow_ridge + [(mw, base_y), (0, base_y)])
 
-            cap_h = int(peak_h * 0.18)
-            cap = [(top[0], top[1] + cap_h), (top[0] - int(peak_w * 0.12), top[1] + int(cap_h * 1.4)), (top[0], top[1]), (top[0] + int(peak_w * 0.10), top[1] + int(cap_h * 1.25))]
-            pygame.draw.polygon(mountain, snow, cap)
-            pygame.draw.polygon(mountain, snow_shadow, [(cap[2][0], cap[2][1]), (cap[3][0], cap[3][1]), (cap[0][0], cap[0][1] + 3)])
+        for i in range(2, len(ridge) - 2):
+            x0, y0 = ridge[i]
+            if y0 < ridge[i - 1][1] - 10 and y0 < ridge[i + 1][1] - 10:
+                cap_w = 90 + int(40 * (0.5 + 0.5 * math.sin((x0 / mw) * math.tau * 2 + phase2)))
+                cap_h = 26
+                top = (x0, y0)
+                cap = [
+                    (top[0], top[1] + cap_h),
+                    (top[0] - int(cap_w * 0.38), top[1] + int(cap_h * 1.55)),
+                    (top[0], top[1]),
+                    (top[0] + int(cap_w * 0.34), top[1] + int(cap_h * 1.45)),
+                ]
+                pygame.draw.polygon(mountain, snow, cap)
+                pygame.draw.polygon(mountain, snow_shadow, [(cap[2][0], cap[2][1]), (cap[3][0], cap[3][1]), (cap[0][0], cap[0][1] + 3)])
 
         pygame.draw.rect(mountain, (70, 95, 120, 80), (0, base_y, mw, SCREEN_HEIGHT - base_y))
 
@@ -80,25 +95,46 @@ class Game:
         forest.fill((0, 0, 0, 0))
 
         ridge_y = int(SCREEN_HEIGHT * 0.78)
-        ridge = [(0, ridge_y)]
+        step = 32
+        fphase1 = rng.random() * math.tau
+        fphase2 = rng.random() * math.tau
+        ridge = []
         rx = 0
         while rx <= fw:
-            ridge.append((rx, ridge_y + rng.randint(-18, 22)))
-            rx += rng.randint(80, 160)
-        ridge.append((fw, ridge_y))
-        ridge.append((fw, SCREEN_HEIGHT))
-        ridge.append((0, SCREEN_HEIGHT))
-        pygame.draw.polygon(forest, (25, 70, 45, 200), ridge)
+            t = (rx / fw) * math.tau
+            dy = (
+                10 * math.sin(t * 1 + fphase1)
+                + 7 * math.sin(t * 2 + fphase2)
+                + 4 * math.sin(t * 3 + (fphase1 * 0.5))
+            )
+            ridge.append((rx, ridge_y + int(dy)))
+            rx += step
+        ridge_poly = ridge + [(fw, SCREEN_HEIGHT), (0, SCREEN_HEIGHT)]
+        pygame.draw.polygon(forest, (25, 70, 45, 200), ridge_poly)
 
+        edge_pad = 160
         for _ in range(140):
             tx = rng.randrange(0, fw)
             ty = ridge_y + rng.randint(-10, 70)
             size = rng.uniform(0.55, 1.25)
             th = int(80 * size)
             tw = max(8, int(34 * size))
-            pygame.draw.rect(forest, (35, 60, 35, 220), (tx - tw // 6, ty, max(2, tw // 3), th), border_radius=2)
-            pygame.draw.polygon(forest, (20, 90, 40, 230), [(tx, ty - int(40 * size)), (tx - tw, ty + int(10 * size)), (tx + tw, ty + int(10 * size))])
-            pygame.draw.polygon(forest, (18, 75, 35, 230), [(tx, ty - int(20 * size)), (tx - int(tw * 0.86), ty + int(28 * size)), (tx + int(tw * 0.86), ty + int(28 * size))])
+
+            for ox in (0,):
+                pygame.draw.rect(forest, (35, 60, 35, 220), (tx + ox - tw // 6, ty, max(2, tw // 3), th), border_radius=2)
+                pygame.draw.polygon(forest, (20, 90, 40, 230), [(tx + ox, ty - int(40 * size)), (tx + ox - tw, ty + int(10 * size)), (tx + ox + tw, ty + int(10 * size))])
+                pygame.draw.polygon(forest, (18, 75, 35, 230), [(tx + ox, ty - int(20 * size)), (tx + ox - int(tw * 0.86), ty + int(28 * size)), (tx + ox + int(tw * 0.86), ty + int(28 * size))])
+
+            if tx < edge_pad:
+                ox = fw
+                pygame.draw.rect(forest, (35, 60, 35, 220), (tx + ox - tw // 6, ty, max(2, tw // 3), th), border_radius=2)
+                pygame.draw.polygon(forest, (20, 90, 40, 230), [(tx + ox, ty - int(40 * size)), (tx + ox - tw, ty + int(10 * size)), (tx + ox + tw, ty + int(10 * size))])
+                pygame.draw.polygon(forest, (18, 75, 35, 230), [(tx + ox, ty - int(20 * size)), (tx + ox - int(tw * 0.86), ty + int(28 * size)), (tx + ox + int(tw * 0.86), ty + int(28 * size))])
+            elif tx > fw - edge_pad:
+                ox = -fw
+                pygame.draw.rect(forest, (35, 60, 35, 220), (tx + ox - tw // 6, ty, max(2, tw // 3), th), border_radius=2)
+                pygame.draw.polygon(forest, (20, 90, 40, 230), [(tx + ox, ty - int(40 * size)), (tx + ox - tw, ty + int(10 * size)), (tx + ox + tw, ty + int(10 * size))])
+                pygame.draw.polygon(forest, (18, 75, 35, 230), [(tx + ox, ty - int(20 * size)), (tx + ox - int(tw * 0.86), ty + int(28 * size)), (tx + ox + int(tw * 0.86), ty + int(28 * size))])
 
         self.bg_layers = {
             "mountain": {"surf": mountain, "parallax": 0.25, "y": 0},
@@ -170,7 +206,7 @@ class Game:
 
     def new_game(self):
         self.boss_fight_active = False
-        self.next_boss_score = 10**5
+        self.next_boss_score = 5*10**4
         
         self.score = 0
         self.game_state = "playing"
@@ -339,7 +375,7 @@ class Game:
                     self.add_score(b.score_val)
                     b.kill()
                     self.boss_fight_active = False 
-                    self.next_boss_score += 10**5
+                    self.next_boss_score += 5*10**4
                     self.boss_cooldown = 10**6
 
         grenade.kill()
@@ -522,7 +558,7 @@ class Game:
                 self.add_score(boss_enemy.score_val)
                 boss_enemy.kill()                
                 self.boss_fight_active = False
-                self.next_boss_score += 10**5
+                self.next_boss_score += 5*10**4
                 self.boss_cooldown = 10**6
         
         # missile vs bullet
