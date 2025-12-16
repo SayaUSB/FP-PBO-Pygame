@@ -240,7 +240,8 @@ class Game:
         
         self.camera_x = 0
         self.world_limit = 0
-        self.generate_chunk(0, 1000)
+        initial_width = max(1600, SCREEN_WIDTH + 800)
+        self.generate_chunk(0, initial_width)
 
         self.trees = []
         self.next_tree_x = 0
@@ -253,6 +254,8 @@ class Game:
         self.airstrike_spawn_timer = 0
         self.airstrike_bombs_left = 0
         self.next_airstrike_x = 2200 + random.randint(0, 1400)
+
+        self.enemy_grace_x = 1800
 
     def apply_miss_penalty(self, amount):
         if self.game_state == "playing":
@@ -312,28 +315,29 @@ class Game:
                 self.barrels.add(barrel)
                 self.all_sprites.add(barrel)
 
-            roll = random.random()
-            if roll < 0.22:
-                e = Soldier(obs_x + obs_w//2, obs_y - 10)
-                self.enemies.add(e)
-                self.all_sprites.add(e)
-            elif roll < 0.58:
-                para_spawn_y = -random.randint(120, 360)
-                para = Paratrooper(self, obs_x + obs_w//2, para_spawn_y)
-                self.enemies.add(para)
-                self.all_sprites.add(para)
-            elif roll < 0.74:
-                tur = TurretSoldier(obs_x + 20, ground_y)
-                self.enemies.add(tur)
-                self.all_sprites.add(tur)
-            elif roll < 0.84:
-                t = Tank(obs_x + 200, ground_y - 10)
-                self.enemies.add(t)
-                self.all_sprites.add(t)
-            elif roll < 0.92:
-                h = Helicopter(obs_x, 150)
-                self.enemies.add(h)
-                self.all_sprites.add(h)
+            if start_x >= getattr(self, 'enemy_grace_x', 0):
+                roll = random.random()
+                if roll < 0.22:
+                    e = Soldier(obs_x + obs_w//2, obs_y - 10)
+                    self.enemies.add(e)
+                    self.all_sprites.add(e)
+                elif roll < 0.58:
+                    para_spawn_y = -random.randint(120, 360)
+                    para = Paratrooper(self, obs_x + obs_w//2, para_spawn_y)
+                    self.enemies.add(para)
+                    self.all_sprites.add(para)
+                elif roll < 0.74:
+                    tur = TurretSoldier(obs_x + 20, ground_y)
+                    self.enemies.add(tur)
+                    self.all_sprites.add(tur)
+                elif roll < 0.84:
+                    t = Tank(obs_x + 200, ground_y - 10)
+                    self.enemies.add(t)
+                    self.all_sprites.add(t)
+                elif roll < 0.92:
+                    h = Helicopter(obs_x, 150)
+                    self.enemies.add(h)
+                    self.all_sprites.add(h)
         self.world_limit = start_x + width
 
     def spawn_loot(self, enemy):
@@ -604,7 +608,7 @@ class Game:
         if not self.battle_lock:
             self.camera_x += (target_cam - self.camera_x) * 0.1
 
-        if self.player.rect.right > self.world_limit - SCREEN_WIDTH:
+        if self.camera_x + SCREEN_WIDTH > self.world_limit - 600:
             self.generate_chunk(self.world_limit, 1200)
 
         if (not self.boss_fight_active) and self.airstrike_state == "idle" and current_x >= self.next_airstrike_x:
