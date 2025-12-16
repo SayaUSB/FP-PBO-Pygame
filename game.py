@@ -29,6 +29,26 @@ class Game:
                 self._bgm_started = True
         except Exception:
             pass
+
+        self._sfx = {}
+        self._sfx_last_play = {}
+        self._sfx_volumes = {
+            'bullet_hit_flesh': 0.55,
+            'bullet_hit_ground': 0.55,
+            'bullet_hit_metal': 0.55,
+            'bullet_hit_obstacle': 0.55,
+            'bullet_hit_shield': 0.60,
+        }
+        self._sfx_paths = {
+            'bullet_hit_flesh': os.path.join('assets', 'sfx', 'bullet_hit_flesh.mp3'),
+            'bullet_hit_ground': os.path.join('assets', 'sfx', 'bullet_hit_ground.mp3'),
+            'bullet_hit_metal': os.path.join('assets', 'sfx', 'bullet_hit_metal.mp3'),
+            'bullet_hit_obstacle': os.path.join('assets', 'sfx', 'bullet_hit_obstacle.mp3'),
+            'bullet_hit_shield': os.path.join('assets', 'sfx', 'bullet_hit_shield.mp3'),
+        }
+
+        for k in self._sfx_paths.keys():
+            self._sfx[k] = None
         bomb_filename = 'assets/beras.png' 
         if os.path.exists(bomb_filename):
             try:
@@ -50,6 +70,44 @@ class Game:
         self.birds = []
         self.bird_spawn_timer = 0
         self._build_background_layers()
+
+    def play_sfx(self, name, cooldown_ms=35):
+        try:
+            if not pygame.mixer.get_init():
+                return
+            path = self._sfx_paths.get(name)
+            if not path or not os.path.exists(path):
+                return
+            now = pygame.time.get_ticks()
+            last = self._sfx_last_play.get(name, -10**9)
+            if cooldown_ms and (now - last) < cooldown_ms:
+                return
+            snd = self._sfx.get(name)
+            if snd is None:
+                try:
+                    snd = pygame.mixer.Sound(path)
+                    snd.set_volume(float(self._sfx_volumes.get(name, 0.6)))
+                    self._sfx[name] = snd
+                except Exception:
+                    self._sfx[name] = False
+                    return
+            if snd is False:
+                return
+            if snd:
+                snd.play()
+                self._sfx_last_play[name] = now
+        except Exception:
+            return
+
+    def get_bullet_hit_sfx_for_platform(self, plat):
+        if getattr(plat, 'is_ground', False):
+            return 'bullet_hit_ground'
+        kind = getattr(plat, 'kind', None)
+        if kind == 'metal':
+            return 'bullet_hit_metal'
+        if kind == 'stone':
+            return 'bullet_hit_ground'
+        return 'bullet_hit_obstacle'
 
     def _build_background_layers(self):
         rng = random.Random(self.bg_seed)
@@ -673,6 +731,7 @@ class Game:
         for barrel, b_list in barrel_hits.items():
             dmg = sum(getattr(b, 'damage', 10) for b in b_list)
             barrel.hp -= dmg
+            self.play_sfx('bullet_hit_metal')
             if barrel.hp <= 0:
                 barrel.explode_now = True
 
@@ -746,6 +805,8 @@ class Game:
             expl = SmallExplosion(b.rect.centerx, b.rect.centery)
             self.all_sprites.add(expl)
             self.effects.add(expl)
+            if plats:
+                self.play_sfx(self.get_bullet_hit_sfx_for_platform(plats[0]))
 
         for g in self.enemy_grenades:
             if g.explode_now:
@@ -785,6 +846,10 @@ class Game:
         # collision: player bullets vs enemies
         hits = pygame.sprite.groupcollide(self.enemies, self.bullets, False, True)
         for e, b_list in hits.items():
+            if e.type_name in ('tank', 'turret', 'heli'):
+                self.play_sfx('bullet_hit_metal')
+            else:
+                self.play_sfx('bullet_hit_flesh')
             for b in b_list:
                 e.hp -= b.damage
                 self.add_score(e.hit_score) 
@@ -816,6 +881,7 @@ class Game:
         # vs boss
         boss_hits = pygame.sprite.groupcollide(self.boss_group, self.bullets, False, True)
         for boss_enemy, bullet_list in boss_hits.items():
+            self.play_sfx('bullet_hit_metal')
             for bullet in bullet_list:
                 boss_enemy.hp -= bullet.damage
                 self.add_score(boss_enemy.hit_score)
@@ -840,6 +906,11 @@ class Game:
             self.all_sprites.add(expl)
             self.effects.add(expl)
 
+        bullet_ground_hits = pygame.sprite.groupcollide(self.bullets, self.platforms, True, False)
+        for b, plats in bullet_ground_hits.items():
+            if plats:
+                self.play_sfx(self.get_bullet_hit_sfx_for_platform(plats[0]))
+
         # rockets vs platforms
         rocket_ground_hits = pygame.sprite.groupcollide(self.rockets, self.platforms, False, False)
         for r in rocket_ground_hits.keys():
@@ -851,6 +922,10 @@ class Game:
             expl = SmallExplosion(bullet.rect.centerx, bullet.rect.centery)
             self.all_sprites.add(expl)
             self.effects.add(expl)
+            if getattr(self.player, 'is_shielding', False) and getattr(self.player, 'shield', 0) > 0:
+                self.play_sfx('bullet_hit_shield')
+            else:
+                self.play_sfx('bullet_hit_flesh')
             self.player.take_damage(bullet.damage)
             
         missile_hit_player = pygame.sprite.spritecollide(self.player, self.missiles, False)
