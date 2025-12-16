@@ -9,6 +9,8 @@ class Game:
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
+            if pygame.mixer.get_init():
+                pygame.mixer.set_num_channels(32)
         except Exception:
             pass
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -60,6 +62,7 @@ class Game:
 
             'boss_intro': 0.65,
             'boss_death_explosion': 0.75,
+            'airstrike_announcement': 0.75,
         }
         self._sfx_paths = {
             'bullet_hit_flesh': os.path.join('assets', 'sfx', 'bullet_hit_flesh.mp3'),
@@ -89,7 +92,18 @@ class Game:
 
             'boss_intro': os.path.join('assets', 'sfx', 'boss_intro.mp3'),
             'boss_death_explosion': os.path.join('assets', 'sfx', 'boss_death_explosion.mp3'),
+            'airstrike_announcement': os.path.join('assets', 'sfx', 'airstrike_announcement.mp3'),
         }
+
+        try:
+            base = os.path.join('assets', 'sfx', 'airstrike_announcement')
+            for ext in ('mp3', 'wav', 'ogg', 'mp4'):
+                p = base + '.' + ext
+                if os.path.exists(p):
+                    self._sfx_paths['airstrike_announcement'] = p
+                    break
+        except Exception:
+            pass
 
         for k in self._sfx_paths.keys():
             self._sfx[k] = None
@@ -138,8 +152,17 @@ class Game:
             if snd is False:
                 return
             if snd:
-                snd.play()
-                self._sfx_last_play[name] = now
+                played = snd.play()
+                if played is None:
+                    try:
+                        ch = pygame.mixer.find_channel(True)
+                        if ch:
+                            ch.play(snd)
+                            self._sfx_last_play[name] = now
+                    except Exception:
+                        return
+                else:
+                    self._sfx_last_play[name] = now
         except Exception:
             return
 
@@ -742,6 +765,7 @@ class Game:
 
         if (not self.boss_fight_active) and self.airstrike_state == "idle" and current_x >= self.next_airstrike_x:
             self.airstrike_state = "warning"
+            self.play_sfx('airstrike_announcement', cooldown_ms=6000)
             self.airstrike_warning_timer = 160
             self.airstrike_active_timer = 420
             self.airstrike_spawn_timer = 30
@@ -804,6 +828,7 @@ class Game:
         self.missiles.update() 
         for m in list(self.missiles):
             if getattr(m, 'explode_now', False):
+                self.play_sfx('explosion_missile_impact', cooldown_ms=80)
                 expl = MediumExplosion(m.rect.centerx, m.rect.centery)
                 self.all_sprites.add(expl)
                 self.effects.add(expl)
@@ -865,6 +890,7 @@ class Game:
 
         for g in self.enemy_grenades:
             if g.explode_now:
+                self.play_sfx('explosion_missile_impact', cooldown_ms=80)
                 expl = Explosion(g.rect.centerx, g.rect.centery)
                 self.all_sprites.add(expl)
                 self.effects.add(expl)
@@ -959,6 +985,7 @@ class Game:
         # missile vs bullet
         missile_hits = pygame.sprite.groupcollide(self.missiles, self.bullets, True, True)
         for m in missile_hits.keys():
+            self.play_sfx('explosion_missile_impact', cooldown_ms=80)
             expl = MediumExplosion(m.rect.centerx, m.rect.centery)
             self.all_sprites.add(expl)
             self.effects.add(expl)
