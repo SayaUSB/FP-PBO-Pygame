@@ -245,6 +245,13 @@ class Game:
         self.birds = []
         self.bird_spawn_timer = 60
 
+        self.airstrike_state = "idle"
+        self.airstrike_warning_timer = 0
+        self.airstrike_active_timer = 0
+        self.airstrike_spawn_timer = 0
+        self.airstrike_bombs_left = 0
+        self.next_airstrike_x = 2200 + random.randint(0, 1400)
+
     def apply_miss_penalty(self, amount):
         if self.game_state == "playing":
             self.score -= amount
@@ -476,6 +483,37 @@ class Game:
 
         if self.player.rect.right > self.world_limit - SCREEN_WIDTH:
             self.generate_chunk(self.world_limit, 1200)
+
+        if (not self.boss_fight_active) and self.airstrike_state == "idle" and current_x >= self.next_airstrike_x:
+            self.airstrike_state = "warning"
+            self.airstrike_warning_timer = 160
+            self.airstrike_active_timer = 420
+            self.airstrike_spawn_timer = 30
+            self.airstrike_bombs_left = random.randint(10, 16)
+
+        if self.airstrike_state == "warning":
+            self.airstrike_warning_timer -= 1 * DT
+            if self.airstrike_warning_timer <= 0:
+                self.airstrike_state = "active"
+
+        if self.airstrike_state == "active":
+            self.airstrike_active_timer -= 1 * DT
+            if self.airstrike_spawn_timer > 0:
+                self.airstrike_spawn_timer -= 1 * DT
+            else:
+                if self.airstrike_bombs_left > 0:
+                    drop_x = self.camera_x + random.randint(80, SCREEN_WIDTH - 80)
+                    drop_y = -random.randint(80, 240)
+                    vx = random.uniform(-1.3, 1.3)
+                    g = Grenade(drop_x, drop_y, vx, is_enemy=True)
+                    self.all_sprites.add(g)
+                    self.enemy_grenades.add(g)
+                    self.airstrike_bombs_left -= 1
+                    self.airstrike_spawn_timer = random.randint(12, 22)
+
+            if self.airstrike_active_timer <= 0 and self.airstrike_bombs_left <= 0:
+                self.airstrike_state = "idle"
+                self.next_airstrike_x = float(current_x) + random.randint(3800, 7000)
 
         # update semua objek
         self.player.get_input(self.all_sprites, self.bullets, self.grenades, self.battle_lock, self.camera_x)
@@ -908,6 +946,13 @@ class Game:
             
             txt_info = self.font.render("F: Shoot (Hold for MG/RL) | C: Shield | G: Grenade", True, GREY)
             self.screen.blit(txt_info, (220, 10))
+
+            if self.airstrike_state == "warning":
+                msg = self.big_font.render("INCOMING AIRSTRIKE!", True, RED)
+                self.screen.blit(msg, (SCREEN_WIDTH//2 - msg.get_width()//2, 120))
+            elif self.airstrike_state == "active":
+                msg = self.big_font.render("AIRSTRIKE!", True, ORANGE)
+                self.screen.blit(msg, (SCREEN_WIDTH//2 - msg.get_width()//2, 120))
 
             # Boss bar
             if self.boss_fight_active and len(self.boss_group) > 0:
