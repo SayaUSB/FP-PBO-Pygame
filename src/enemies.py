@@ -248,16 +248,42 @@ class TurretSoldier(Enemy):
         pygame.draw.line(surf, uniform, right_shoulder, right_hand, 6)
 
         recoil = -3 if firing else 0
-        gun_y = int(h * 0.48)
-        gun_rect = pygame.Rect(int(w * 0.52) + recoil, gun_y, int(w * 0.46), 8)
-        pygame.draw.rect(surf, gun, gun_rect, border_radius=3)
-        pygame.draw.rect(surf, gun_dark, (gun_rect.x + 6, gun_rect.y + 2, 10, 4), border_radius=2)
-        pygame.draw.rect(surf, gun_dark, (gun_rect.right - 10, gun_rect.y + 1, 8, 6), border_radius=2)
+        gun_y = int(h * 0.47)
+
+        body_w = int(w * 0.34)
+        body_h = 14
+        body_x = int(w * 0.50) + recoil
+        body_rect = pygame.Rect(body_x, gun_y - 3, body_w, body_h)
+        pygame.draw.rect(surf, gun, body_rect, border_radius=4)
+        pygame.draw.rect(surf, gun_dark, body_rect, 2, border_radius=4)
+        pygame.draw.rect(surf, gun_dark, (body_rect.x + 6, body_rect.y + 3, 10, 6), border_radius=2)
+
+        ammo_box = pygame.Rect(body_rect.x - 12, body_rect.y + 3, 12, 12)
+        pygame.draw.rect(surf, (35, 35, 35), ammo_box, border_radius=2)
+        pygame.draw.rect(surf, (15, 15, 15), ammo_box, 2, border_radius=2)
+        pygame.draw.line(surf, (85, 85, 85), (ammo_box.right, ammo_box.centery), (body_rect.x + 2, body_rect.y + 2), 2)
+        pygame.draw.line(surf, (85, 85, 85), (ammo_box.right, ammo_box.centery), (body_rect.x + 2, body_rect.bottom - 2), 2)
+
+        cluster_len = int(w * 0.22)
+        barrel_spacing = 2
+        barrel_count = 6
+        cluster_x = body_rect.right - 4
+        cluster_y = body_rect.centery - ((barrel_count - 1) * barrel_spacing) // 2
+        for i in range(barrel_count):
+            by = cluster_y + i * barrel_spacing
+            pygame.draw.line(surf, gun_dark, (cluster_x, by), (cluster_x + cluster_len, by), 2)
+        pygame.draw.circle(surf, gun_dark, (cluster_x, body_rect.centery), 6, 2)
+        pygame.draw.circle(surf, (90, 90, 90), (cluster_x, body_rect.centery), 4)
+
+        grip = pygame.Rect(body_rect.x + 8, body_rect.bottom - 1, 10, 12)
+        pygame.draw.rect(surf, (25, 25, 25), grip, border_radius=3)
+        pygame.draw.rect(surf, (10, 10, 10), grip, 2, border_radius=3)
 
         if firing:
-            mx = gun_rect.right + 2
-            my = gun_rect.centery
-            pygame.draw.polygon(surf, heat, [(mx, my), (mx + 12, my - 5), (mx + 12, my + 5)])
+            mx = cluster_x + cluster_len + 2
+            my = body_rect.centery
+            for k in (-4, 0, 4):
+                pygame.draw.polygon(surf, heat, [(mx, my + k), (mx + 12, my + k - 5), (mx + 12, my + k + 5)])
             pygame.draw.circle(surf, (255, 240, 180), (mx + 6, my), 3)
 
         if facing == -1:
