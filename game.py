@@ -6,6 +6,11 @@ from platforms import Platform, ExplosiveBarrel
 class Game:
     def __init__(self):
         pygame.init()
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+        except Exception:
+            pass
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Metal Slug: Clone")
         self.clock = pygame.time.Clock()
@@ -13,6 +18,17 @@ class Game:
         self.font = pygame.font.SysFont("Arial", 18)
         self.big_font = pygame.font.SysFont("Arial", 40, bold=True)
         self.title_font = pygame.font.SysFont("Arial", 60, bold=True)
+
+        self._bgm_started = False
+        try:
+            bgm_path = os.path.join('assets', 'sfx', 'background_music.mp3')
+            if (not self._bgm_started) and os.path.exists(bgm_path) and pygame.mixer.get_init():
+                pygame.mixer.music.load(bgm_path)
+                pygame.mixer.music.set_volume(0.45)
+                pygame.mixer.music.play(-1)
+                self._bgm_started = True
+        except Exception:
+            pass
         bomb_filename = 'assets/beras.png' 
         if os.path.exists(bomb_filename):
             try:
