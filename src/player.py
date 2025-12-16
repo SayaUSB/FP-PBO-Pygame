@@ -340,6 +340,9 @@ class Player(pygame.sprite.Sprite):
                         death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
                         all_sprites.add(death)
                         effects_group.add(death)
+                    if e.type_name == 'turret':
+                        if hasattr(self.game_ref, 'trigger_turret_death_explosion'):
+                            self.game_ref.trigger_turret_death_explosion(e)
                     spawn_loot_callback(e) 
                     add_score_callback(e.score_val) # Kill Bonus
                     e.kill()

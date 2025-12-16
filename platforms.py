@@ -120,9 +120,9 @@ class Platform(pygame.sprite.Sprite):
             pygame.draw.rect(self.image, dark, (0, 0, w, h), 3)
 
         elif self.kind == "barrel":
-            base = (170, 60, 60)
-            dark = (120, 35, 35)
-            light = (220, 110, 110)
+            base = (110, 125, 155)
+            dark = (70, 85, 110)
+            light = (170, 190, 220)
             self.image.fill((0, 0, 0, 0))
             pygame.draw.rect(self.image, base, (0, 0, w, h), border_radius=max(2, min(12, w // 4)))
             pygame.draw.rect(self.image, dark, (0, 0, w, h), 3, border_radius=max(2, min(12, w // 4)))
@@ -140,3 +140,30 @@ class Platform(pygame.sprite.Sprite):
         else:
             self.image.fill(GREEN)
             pygame.draw.rect(self.image, (80, 80, 80), (0, 0, w, h), 2)
+
+class ExplosiveBarrel(pygame.sprite.Sprite):
+    def __init__(self, x, y_bottom):
+        super().__init__()
+        w, h = 44, 60
+        self.image = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        base = (205, 50, 50)
+        dark = (135, 25, 25)
+        light = (255, 120, 120)
+        hazard = (255, 210, 60)
+
+        pygame.draw.rect(self.image, base, (0, 0, w, h), border_radius=10)
+        pygame.draw.rect(self.image, dark, (0, 0, w, h), 3, border_radius=10)
+        band_h = 9
+        pygame.draw.rect(self.image, dark, (0, band_h, w, band_h))
+        pygame.draw.rect(self.image, dark, (0, h - 2 * band_h, w, band_h))
+        pygame.draw.rect(self.image, light, (w // 4, 7, 5, h - 14))
+
+        cx, cy = w // 2, h // 2
+        pygame.draw.circle(self.image, hazard, (cx, cy), 10)
+        pygame.draw.circle(self.image, dark, (cx, cy), 10, 2)
+        pygame.draw.polygon(self.image, dark, [(cx - 3, cy - 6), (cx + 3, cy - 6), (cx, cy + 6)])
+
+        self.rect = self.image.get_rect(midbottom=(int(x), int(y_bottom)))
+        self.hp = 60
+        self.explode_now = False

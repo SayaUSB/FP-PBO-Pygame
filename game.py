@@ -1,7 +1,8 @@
 import pygame, random, math, os, sys
 from settings import *
 from src import *
-from platforms import Platform
+from platforms import Platform, ExplosiveBarrel
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -221,6 +222,7 @@ class Game:
 
         self.all_sprites   = pygame.sprite.Group()
         self.platforms     = pygame.sprite.Group()
+        self.barrels       = pygame.sprite.Group()
         self.bullets       = pygame.sprite.Group()
         self.enemy_bullets = pygame.sprite.Group()
         self.missiles      = pygame.sprite.Group()
@@ -303,17 +305,28 @@ class Game:
             self.platforms.add(p)
             self.all_sprites.add(p)
 
+            if random.random() < 0.22:
+                bx = obs_x + obs_w // 2 + random.randint(-50, 50)
+                barrel = ExplosiveBarrel(bx, ground_y)
+                self.platforms.add(barrel)
+                self.barrels.add(barrel)
+                self.all_sprites.add(barrel)
+
             roll = random.random()
-            if roll < 0.25:
+            if roll < 0.22:
                 e = Soldier(obs_x + obs_w//2, obs_y - 10)
                 self.enemies.add(e)
                 self.all_sprites.add(e)
-            elif roll < 0.70:
+            elif roll < 0.58:
                 para_spawn_y = -random.randint(120, 360)
                 para = Paratrooper(self, obs_x + obs_w//2, para_spawn_y)
                 self.enemies.add(para)
                 self.all_sprites.add(para)
-            elif roll < 0.82:
+            elif roll < 0.74:
+                tur = TurretSoldier(obs_x + 20, ground_y)
+                self.enemies.add(tur)
+                self.all_sprites.add(tur)
+            elif roll < 0.84:
                 t = Tank(obs_x + 200, ground_y - 10)
                 self.enemies.add(t)
                 self.all_sprites.add(t)
@@ -358,6 +371,11 @@ class Game:
         EXPLOSION_RADIUS = 300
         EXPLOSION_DAMAGE = 120 
 
+        for barrel in list(self.barrels):
+            dist = math.hypot(barrel.rect.centerx - grenade.rect.centerx, barrel.rect.centery - grenade.rect.centery)
+            if dist < EXPLOSION_RADIUS:
+                barrel.explode_now = True
+
         for e in self.enemies:
             dist = math.hypot(e.rect.centerx - grenade.rect.centerx, e.rect.centery - grenade.rect.centery)
             if dist < EXPLOSION_RADIUS:
@@ -378,6 +396,8 @@ class Game:
                     self.effects.add(expl)
                 self.spawn_loot(e)
                 self.add_score(e.score_val)
+                if e.type_name == 'turret':
+                    self.trigger_turret_death_explosion(e)
                 e.kill()
     
         for b in self.boss_group:
@@ -406,6 +426,11 @@ class Game:
         EXPLOSION_RADIUS = 300
         EXPLOSION_DAMAGE = 120
 
+        for barrel in list(self.barrels):
+            dist = math.hypot(barrel.rect.centerx - rocket.rect.centerx, barrel.rect.centery - rocket.rect.centery)
+            if dist < EXPLOSION_RADIUS:
+                barrel.explode_now = True
+
         for e in self.enemies:
             dist = math.hypot(e.rect.centerx - rocket.rect.centerx, e.rect.centery - rocket.rect.centery)
             if dist < EXPLOSION_RADIUS:
@@ -426,6 +451,8 @@ class Game:
                     self.effects.add(expl)
                 self.spawn_loot(e)
                 self.add_score(e.score_val)
+                if e.type_name == 'turret':
+                    self.trigger_turret_death_explosion(e)
                 e.kill()
 
         for b in self.boss_group:
@@ -442,6 +469,102 @@ class Game:
                     self.boss_cooldown = 10**6
 
         rocket.kill()
+
+    def trigger_turret_death_explosion(self, turret):
+        if getattr(turret, 'did_explode', False):
+            return
+        turret.did_explode = True
+
+        expl = MediumExplosion(turret.rect.centerx, turret.rect.centery)
+        self.all_sprites.add(expl)
+        self.effects.add(expl)
+
+        radius = 170
+        damage = 55
+
+        dist_p = math.hypot(self.player.rect.centerx - turret.rect.centerx, self.player.rect.centery - turret.rect.centery)
+        if dist_p < radius:
+            self.player.take_damage(25)
+
+        for barrel in list(self.barrels):
+            dist = math.hypot(barrel.rect.centerx - turret.rect.centerx, barrel.rect.centery - turret.rect.centery)
+            if dist < radius * 0.85:
+                barrel.explode_now = True
+
+        for e in list(self.enemies):
+            if e is turret:
+                continue
+            dist = math.hypot(e.rect.centerx - turret.rect.centerx, e.rect.centery - turret.rect.centery)
+            if dist < radius:
+                e.hp -= damage
+                self.add_score(e.hit_score)
+                if e.hp <= 0:
+                    if e.type_name in ('soldier', 'paratrooper'):
+                        death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
+                        self.all_sprites.add(death)
+                        self.effects.add(death)
+                    if e.type_name == 'heli':
+                        if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
+                            e.begin_crash()
+                        continue
+                    if e.type_name == 'tank':
+                        ee = Explosion(e.rect.centerx, e.rect.centery)
+                        self.all_sprites.add(ee)
+                        self.effects.add(ee)
+                    self.spawn_loot(e)
+                    self.add_score(e.score_val)
+                    if e.type_name == 'turret':
+                        self.trigger_turret_death_explosion(e)
+                    e.kill()
+
+    def trigger_barrel_explosion(self, barrel):
+        if getattr(barrel, 'did_explode', False):
+            return
+        barrel.did_explode = True
+
+        expl = Explosion(barrel.rect.centerx, barrel.rect.centery)
+        self.all_sprites.add(expl)
+        self.effects.add(expl)
+
+        radius = 190
+        damage = 70
+
+        dist_p = math.hypot(self.player.rect.centerx - barrel.rect.centerx, self.player.rect.centery - barrel.rect.centery)
+        if dist_p < radius:
+            self.player.take_damage(35)
+
+        for e in list(self.enemies):
+            dist = math.hypot(e.rect.centerx - barrel.rect.centerx, e.rect.centery - barrel.rect.centery)
+            if dist < radius:
+                e.hp -= damage
+                self.add_score(e.hit_score)
+                if e.hp <= 0:
+                    if e.type_name in ('soldier', 'paratrooper'):
+                        death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
+                        self.all_sprites.add(death)
+                        self.effects.add(death)
+                    if e.type_name == 'heli':
+                        if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
+                            e.begin_crash()
+                        continue
+                    if e.type_name == 'tank':
+                        ee = Explosion(e.rect.centerx, e.rect.centery)
+                        self.all_sprites.add(ee)
+                        self.effects.add(ee)
+                    self.spawn_loot(e)
+                    self.add_score(e.score_val)
+                    if e.type_name == 'turret':
+                        self.trigger_turret_death_explosion(e)
+                    e.kill()
+
+        for other in list(self.barrels):
+            if other is barrel:
+                continue
+            dist = math.hypot(other.rect.centerx - barrel.rect.centerx, other.rect.centery - barrel.rect.centery)
+            if dist < radius * 0.85:
+                other.explode_now = True
+
+        barrel.kill()
 
     def update(self):
         if self.game_state in ("menu", "paused"):
@@ -525,6 +648,25 @@ class Game:
         self.grenades.update()
         self.enemy_grenades.update() 
         self.enemy_bullets.update()
+
+        barrel_hits = pygame.sprite.groupcollide(self.barrels, self.bullets, False, True)
+        for barrel, b_list in barrel_hits.items():
+            dmg = sum(getattr(b, 'damage', 10) for b in b_list)
+            barrel.hp -= dmg
+            if barrel.hp <= 0:
+                barrel.explode_now = True
+
+        barrel_hits2 = pygame.sprite.groupcollide(self.barrels, self.enemy_bullets, False, True)
+        for barrel, b_list in barrel_hits2.items():
+            dmg = sum(getattr(b, 'damage', 10) for b in b_list)
+            barrel.hp -= dmg
+            if barrel.hp <= 0:
+                barrel.explode_now = True
+
+        for barrel in list(self.barrels):
+            if getattr(barrel, 'explode_now', False):
+                self.trigger_barrel_explosion(barrel)
+
         self.missiles.update() 
         for m in list(self.missiles):
             if getattr(m, 'explode_now', False):
@@ -642,6 +784,8 @@ class Game:
                     self.effects.add(expl)
                 self.spawn_loot(e)
                 self.add_score(e.score_val)
+                if e.type_name == 'turret':
+                    self.trigger_turret_death_explosion(e)
                 e.kill()
 
         rocket_hits = pygame.sprite.groupcollide(self.enemies, self.rockets, False, False)

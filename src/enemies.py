@@ -184,6 +184,140 @@ class Soldier(Enemy):
                 self.shoot_timer = 0
                 self.shoot_anim_timer = 10
 
+class TurretSoldier(Enemy):
+    def __init__(self, x, y):
+        super().__init__(x, y, (110, 110, 110), 85, 'turret', 220, 12)
+        self.width = 54
+        self.height = 78
+        self.facing = 1
+
+        self.image = self._draw_gunner_frame(self.facing, firing=False)
+        self.rect = self.image.get_rect(bottomleft=(x, y))
+        self.pos_x = float(self.rect.x)
+        self.pos_y = float(self.rect.y)
+        self.vel_y = 0
+
+        self.burst_left = 0
+        self.burst_cd = 0
+        self.shoot_timer = random.randint(20, 90)
+        self.shoot_anim_timer = 0
+
+    def _draw_gunner_frame(self, facing, firing=False):
+        w = self.width
+        h = self.height
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        skin = (220, 180, 140)
+        uniform = (70, 110, 70)
+        uniform_dark = (45, 75, 45)
+        helmet = (55, 70, 60)
+        helmet_dark = (35, 45, 40)
+        boots = (30, 30, 30)
+        gun = (22, 22, 22)
+        gun_dark = (60, 60, 60)
+        heat = (255, 200, 60)
+        visor = (120, 170, 190)
+
+        head_r = 8
+        head = (int(w * 0.50), int(h * 0.20))
+        pygame.draw.circle(surf, skin, head, head_r)
+        pygame.draw.circle(surf, helmet, (head[0], head[1] - 2), head_r + 3)
+        pygame.draw.circle(surf, helmet_dark, (head[0] - 2, head[1] - 4), head_r + 3, 2)
+        pygame.draw.rect(surf, visor, (head[0] - 7, head[1] - 3, 14, 5), border_radius=2)
+
+        torso = pygame.Rect(int(w * 0.30), int(h * 0.32), int(w * 0.40), int(h * 0.30))
+        pygame.draw.rect(surf, uniform, torso, border_radius=6)
+        pygame.draw.rect(surf, uniform_dark, (torso.x, torso.y + torso.h // 2, torso.w, torso.h // 2), border_radius=6)
+
+        hip_y = int(h * 0.68)
+        left_hip = (int(w * 0.40), hip_y)
+        right_hip = (int(w * 0.58), hip_y)
+        left_foot = (int(w * 0.38), int(h * 0.96))
+        right_foot = (int(w * 0.62), int(h * 0.96))
+        pygame.draw.line(surf, uniform, left_hip, left_foot, 7)
+        pygame.draw.line(surf, uniform, right_hip, right_foot, 7)
+        pygame.draw.rect(surf, boots, (left_foot[0] - 6, left_foot[1] - 3, 14, 7), border_radius=2)
+        pygame.draw.rect(surf, boots, (right_foot[0] - 6, right_foot[1] - 3, 14, 7), border_radius=2)
+
+        shoulder_y = int(h * 0.44)
+        left_shoulder = (int(w * 0.36), shoulder_y)
+        right_shoulder = (int(w * 0.64), shoulder_y)
+        left_hand = (int(w * 0.34), int(h * 0.56))
+        right_hand = (int(w * 0.78), int(h * 0.50))
+        pygame.draw.line(surf, uniform, left_shoulder, left_hand, 6)
+        pygame.draw.line(surf, uniform, right_shoulder, right_hand, 6)
+
+        recoil = -3 if firing else 0
+        gun_y = int(h * 0.48)
+        gun_rect = pygame.Rect(int(w * 0.52) + recoil, gun_y, int(w * 0.46), 8)
+        pygame.draw.rect(surf, gun, gun_rect, border_radius=3)
+        pygame.draw.rect(surf, gun_dark, (gun_rect.x + 6, gun_rect.y + 2, 10, 4), border_radius=2)
+        pygame.draw.rect(surf, gun_dark, (gun_rect.right - 10, gun_rect.y + 1, 8, 6), border_radius=2)
+
+        if firing:
+            mx = gun_rect.right + 2
+            my = gun_rect.centery
+            pygame.draw.polygon(surf, heat, [(mx, my), (mx + 12, my - 5), (mx + 12, my + 5)])
+            pygame.draw.circle(surf, (255, 240, 180), (mx + 6, my), 3)
+
+        if facing == -1:
+            surf = pygame.transform.flip(surf, True, False)
+        return surf
+
+    def update(self, platforms, player, bullets, all_sprites, missiles_group=None, grenades_group=None, bullet_img=None):
+        self.vel_y += GRAVITY * DT
+        self.pos_y += self.vel_y * DT
+        self.rect.y = int(self.pos_y)
+
+        hits = pygame.sprite.spritecollide(self, platforms, False)
+        for p in hits:
+            if self.vel_y > 0:
+                self.rect.bottom = p.rect.top
+                self.vel_y = 0
+                self.pos_y = float(self.rect.y)
+        self.check_bounds()
+
+        dist_x = player.rect.centerx - self.rect.centerx
+        dist_y = player.rect.centery - self.rect.centery
+        self.facing = 1 if dist_x >= 0 else -1
+
+        if self.shoot_anim_timer > 0:
+            self.shoot_anim_timer -= 1 * DT
+
+        if self.burst_cd > 0:
+            self.burst_cd -= 1 * DT
+
+        self.shoot_timer += 1 * DT
+        in_range = abs(dist_x) < 950
+
+        if in_range and self.burst_left <= 0 and self.shoot_timer > 70:
+            self.burst_left = random.randint(4, 7)
+            self.burst_cd = 0
+            self.shoot_timer = 0
+
+        if in_range and self.burst_left > 0 and self.burst_cd <= 0:
+            mag = math.hypot(dist_x, dist_y)
+            if mag > 0.001:
+                vx = dist_x / mag
+                vy = dist_y / mag
+                vx += random.uniform(-0.06, 0.06)
+                vy += random.uniform(-0.05, 0.05)
+                mag2 = math.hypot(vx, vy)
+                if mag2 > 0.001:
+                    vx /= mag2
+                    vy /= mag2
+                b = Bullet(self.rect.centerx, self.rect.centery, vx, vy, damage=10, is_enemy=True, bullet_img=bullet_img)
+                bullets.add(b)
+                all_sprites.add(b)
+
+            self.burst_left -= 1
+            self.burst_cd = 6
+            self.shoot_anim_timer = 6
+
+        bl = self.rect.bottomleft
+        firing = (self.shoot_anim_timer > 0)
+        self.image = self._draw_gunner_frame(self.facing, firing=firing)
+        self.rect = self.image.get_rect(bottomleft=bl)
 
 class Paratrooper(Enemy):
     def __init__(self, game_ref, x, y):
