@@ -332,6 +332,8 @@ class TurretSoldier(Enemy):
                 if mag2 > 0.001:
                     vx /= mag2
                     vy /= mag2
+                if hasattr(player, 'game_ref') and hasattr(player.game_ref, 'play_sfx'):
+                    player.game_ref.play_sfx('gunshot_gatling_gun', cooldown_ms=1)
                 b = Bullet(self.rect.centerx, self.rect.centery, vx, vy, damage=10, is_enemy=True, bullet_img=bullet_img)
                 bullets.add(b)
                 all_sprites.add(b)

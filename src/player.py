@@ -238,6 +238,8 @@ class Player(pygame.sprite.Sprite):
 
     def fire_bullet(self, bullets, all_sprites):
         if self.weapon_type == "rocket":
+            if hasattr(self.game_ref, 'play_sfx'):
+                self.game_ref.play_sfx('gunshot_assault_rifle', cooldown_ms=120)
             target = None
             best_d = None
             try:
@@ -306,6 +308,12 @@ class Player(pygame.sprite.Sprite):
         
         is_hmg = (self.weapon_type == "hmg")
         dmg = 25 if is_hmg else 20
+
+        if hasattr(self.game_ref, 'play_sfx'):
+            if is_hmg:
+                self.game_ref.play_sfx('gunshot_gatling_gun', cooldown_ms=55)
+            else:
+                self.game_ref.play_sfx('gunshot_pistol', cooldown_ms=90)
         
         b = Bullet(self.rect.centerx, self.rect.centery, dx, dy, damage=dmg, is_hmg=is_hmg, miss_callback=self.game_ref.apply_miss_penalty)
         all_sprites.add(b)

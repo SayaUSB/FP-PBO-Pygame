@@ -38,6 +38,28 @@ class Game:
             'bullet_hit_metal': 0.55,
             'bullet_hit_obstacle': 0.55,
             'bullet_hit_shield': 0.60,
+
+            'gunshot_pistol': 0.55,
+            'gunshot_assault_rifle': 0.55,
+            'gunshot_gatling_gun': 0.50,
+
+            'explosion_small': 0.65,
+            'explosion_big': 0.70,
+            'explosion_missile_impact': 0.70,
+
+            'death_enemy': 0.60,
+            'death_player': 0.70,
+            'crash': 0.70,
+
+            'pickup_health': 0.60,
+            'pickup_machine_gun': 0.60,
+            'pickup_rocket_launcher': 0.60,
+
+            'ui_confirm': 0.55,
+            'ui_back': 0.55,
+
+            'boss_intro': 0.65,
+            'boss_death_explosion': 0.75,
         }
         self._sfx_paths = {
             'bullet_hit_flesh': os.path.join('assets', 'sfx', 'bullet_hit_flesh.mp3'),
@@ -45,6 +67,28 @@ class Game:
             'bullet_hit_metal': os.path.join('assets', 'sfx', 'bullet_hit_metal.mp3'),
             'bullet_hit_obstacle': os.path.join('assets', 'sfx', 'bullet_hit_obstacle.mp3'),
             'bullet_hit_shield': os.path.join('assets', 'sfx', 'bullet_hit_shield.mp3'),
+
+            'gunshot_pistol': os.path.join('assets', 'sfx', 'gunshot_pistol.mp3'),
+            'gunshot_assault_rifle': os.path.join('assets', 'sfx', 'gunshot_assault_rifle.mp3'),
+            'gunshot_gatling_gun': os.path.join('assets', 'sfx', 'gunshot_assault_rifle.mp3'),
+
+            'explosion_small': os.path.join('assets', 'sfx', 'explosion_small.mp3'),
+            'explosion_big': os.path.join('assets', 'sfx', 'explosion_big.mp3'),
+            'explosion_missile_impact': os.path.join('assets', 'sfx', 'explosion_missile_impact.mp3'),
+
+            'death_enemy': os.path.join('assets', 'sfx', 'death_enemy.mp3'),
+            'death_player': os.path.join('assets', 'sfx', 'death_player.mp3'),
+            'crash': os.path.join('assets', 'sfx', 'crash.mp3'),
+
+            'pickup_health': os.path.join('assets', 'sfx', 'pickup_health.mp3'),
+            'pickup_machine_gun': os.path.join('assets', 'sfx', 'pickup_machine_gun.mp3'),
+            'pickup_rocket_launcher': os.path.join('assets', 'sfx', 'pickup_rocket_launcher.mp3'),
+
+            'ui_confirm': os.path.join('assets', 'sfx', 'ui_confirm.mp3'),
+            'ui_back': os.path.join('assets', 'sfx', 'ui_back.mp3'),
+
+            'boss_intro': os.path.join('assets', 'sfx', 'boss_intro.mp3'),
+            'boss_death_explosion': os.path.join('assets', 'sfx', 'boss_death_explosion.mp3'),
         }
 
         for k in self._sfx_paths.keys():
@@ -443,6 +487,7 @@ class Game:
                 self.all_sprites.add(item)
 
     def trigger_explosion(self, grenade):
+        self.play_sfx('explosion_small', cooldown_ms=60)
         expl = Explosion(grenade.rect.centerx, grenade.rect.centery)
         self.all_sprites.add(expl)
         self.effects.add(expl)
@@ -461,14 +506,17 @@ class Game:
                 self.add_score(e.hit_score) 
             if e.hp <= 0:
                 if e.type_name in ('soldier', 'paratrooper'):
+                    self.play_sfx('death_enemy', cooldown_ms=80)
                     death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
                     self.all_sprites.add(death)
                     self.effects.add(death)
                 if e.type_name == 'heli':
                     if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
                         e.begin_crash()
+                        self.play_sfx('crash', cooldown_ms=160)
                     continue
                 if e.type_name == 'tank':
+                    self.play_sfx('explosion_big', cooldown_ms=120)
                     expl = Explosion(e.rect.centerx, e.rect.centery)
                     self.all_sprites.add(expl)
                     self.effects.add(expl)
@@ -497,6 +545,8 @@ class Game:
         if getattr(rocket, 'did_explode', False):
             return
         rocket.did_explode = True
+
+        self.play_sfx('explosion_missile_impact', cooldown_ms=80)
 
         expl = Explosion(rocket.rect.centerx, rocket.rect.centery)
         self.all_sprites.add(expl)
@@ -553,6 +603,8 @@ class Game:
             return
         turret.did_explode = True
 
+        self.play_sfx('explosion_big', cooldown_ms=90)
+
         expl = MediumExplosion(turret.rect.centerx, turret.rect.centery)
         self.all_sprites.add(expl)
         self.effects.add(expl)
@@ -599,6 +651,8 @@ class Game:
         if getattr(barrel, 'did_explode', False):
             return
         barrel.did_explode = True
+
+        self.play_sfx('explosion_big', cooldown_ms=80)
 
         expl = Explosion(barrel.rect.centerx, barrel.rect.centery)
         self.all_sprites.add(expl)
@@ -668,6 +722,7 @@ class Game:
         # boss spawn logic
         if self.score >= self.next_boss_score and not self.boss_fight_active and self.boss_cooldown <= 0:
             self.boss_fight_active = True
+            self.play_sfx('boss_intro', cooldown_ms=400)
             boss_spawn_x = self.camera_x + SCREEN_WIDTH - 200
             boss = BossHelicopter(boss_spawn_x, 200)
             self.boss_group.add(boss)
@@ -887,6 +942,8 @@ class Game:
                 self.add_score(boss_enemy.hit_score)
             
             if boss_enemy.hp <= 0:
+                self.play_sfx('boss_death_explosion', cooldown_ms=250)
+                self.play_sfx('explosion_big', cooldown_ms=250)
                 self.spawn_loot(boss_enemy)
                 self.add_score(boss_enemy.score_val)
                 boss_enemy.kill()                
@@ -942,12 +999,15 @@ class Game:
             self.add_score(100)
             
             if item.type_name == 'heal':
+                self.play_sfx('pickup_health', cooldown_ms=80)
                 self.player.hp = min(self.player.max_hp, self.player.hp + 30)
             elif item.type_name == 'mg':
+                self.play_sfx('pickup_machine_gun', cooldown_ms=80)
                 self.player.weapon_type = "hmg"
                 self.player.ammo += 100
                 self.hmg_pickup_msg_timer = 60
             elif item.type_name == 'rl':
+                self.play_sfx('pickup_rocket_launcher', cooldown_ms=80)
                 self.player.weapon_type = "rocket"
                 self.player.ammo += 18
                 self.rl_pickup_msg_timer = 60
@@ -955,6 +1015,7 @@ class Game:
         # game over
         if self.player.hp <= 0:
             if not getattr(self, 'player_death_spawned', False):
+                self.play_sfx('death_player', cooldown_ms=250)
                 death = PlayerDeath(self.player.rect.centerx, self.player.rect.centery, facing=getattr(self.player, 'facing', 1))
                 self.all_sprites.add(death)
                 self.effects.add(death)
@@ -982,20 +1043,26 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if self.game_state == "menu":
                     if event.key == pygame.K_RETURN:
+                        self.play_sfx('ui_confirm', cooldown_ms=120)
                         self.new_game()
                     if event.key == pygame.K_ESCAPE:
+                        self.play_sfx('ui_back', cooldown_ms=120)
                         self.running = False
 
                 elif self.game_state == "paused":
                     if event.key in (pygame.K_ESCAPE, pygame.K_p):
+                        self.play_sfx('ui_confirm', cooldown_ms=120)
                         self.game_state = "playing"
                     if event.key == pygame.K_m:
+                        self.play_sfx('ui_back', cooldown_ms=120)
                         self.game_state = "menu"
                     if event.key == pygame.K_r:
+                        self.play_sfx('ui_confirm', cooldown_ms=120)
                         self.new_game()
 
                 elif self.game_state == "playing":
                     if event.key in (pygame.K_ESCAPE, pygame.K_p):
+                        self.play_sfx('ui_back', cooldown_ms=120)
                         self.game_state = "paused"
                         continue
 
@@ -1007,10 +1074,13 @@ class Game:
                 
                 elif self.game_state == "game_over":
                     if event.key == pygame.K_r:
+                        self.play_sfx('ui_confirm', cooldown_ms=120)
                         self.new_game()
                     if event.key == pygame.K_ESCAPE:
+                        self.play_sfx('ui_back', cooldown_ms=120)
                         self.running = False
                     if event.key == pygame.K_m:
+                        self.play_sfx('ui_back', cooldown_ms=120)
                         self.game_state = "menu"
 
     def draw_tree(self, x, y, size=1.0):
