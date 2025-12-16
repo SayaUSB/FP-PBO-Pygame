@@ -73,7 +73,7 @@ class Game:
             'gunshot_gatling_gun': os.path.join('assets', 'sfx', 'gunshot_assault_rifle.mp3'),
 
             'explosion_small': os.path.join('assets', 'sfx', 'explosion_small.mp3'),
-            'explosion_big': os.path.join('assets', 'sfx', 'explosion_big.mp3'),
+            'explosion_big': os.path.join('assets', 'sfx', 'explosion_missile_impact.mp3'),
             'explosion_missile_impact': os.path.join('assets', 'sfx', 'explosion_missile_impact.mp3'),
 
             'death_enemy': os.path.join('assets', 'sfx', 'death_enemy.mp3'),
@@ -487,7 +487,7 @@ class Game:
                 self.all_sprites.add(item)
 
     def trigger_explosion(self, grenade):
-        self.play_sfx('explosion_small', cooldown_ms=60)
+        self.play_sfx('explosion_small', cooldown_ms=1)
         expl = Explosion(grenade.rect.centerx, grenade.rect.centery)
         self.all_sprites.add(expl)
         self.effects.add(expl)
@@ -506,17 +506,17 @@ class Game:
                 self.add_score(e.hit_score) 
             if e.hp <= 0:
                 if e.type_name in ('soldier', 'paratrooper'):
-                    self.play_sfx('death_enemy', cooldown_ms=80)
+                    self.play_sfx('death_enemy', cooldown_ms=1)
                     death = SoldierDeath(e.rect.centerx, e.rect.bottom - 15, facing=getattr(e, 'facing', 1))
                     self.all_sprites.add(death)
                     self.effects.add(death)
                 if e.type_name == 'heli':
                     if hasattr(e, 'begin_crash') and not getattr(e, 'crashing', False):
                         e.begin_crash()
-                        self.play_sfx('crash', cooldown_ms=160)
+                        self.play_sfx('crash', cooldown_ms=1)
                     continue
                 if e.type_name == 'tank':
-                    self.play_sfx('explosion_big', cooldown_ms=120)
+                    self.play_sfx('explosion_big', cooldown_ms=1)
                     expl = Explosion(e.rect.centerx, e.rect.centery)
                     self.all_sprites.add(expl)
                     self.effects.add(expl)
@@ -546,7 +546,7 @@ class Game:
             return
         rocket.did_explode = True
 
-        self.play_sfx('explosion_missile_impact', cooldown_ms=80)
+        self.play_sfx('explosion_missile_impact', cooldown_ms=1)
 
         expl = Explosion(rocket.rect.centerx, rocket.rect.centery)
         self.all_sprites.add(expl)
@@ -603,7 +603,7 @@ class Game:
             return
         turret.did_explode = True
 
-        self.play_sfx('explosion_big', cooldown_ms=90)
+        self.play_sfx('explosion_big', cooldown_ms=1)
 
         expl = MediumExplosion(turret.rect.centerx, turret.rect.centery)
         self.all_sprites.add(expl)
@@ -652,7 +652,7 @@ class Game:
             return
         barrel.did_explode = True
 
-        self.play_sfx('explosion_big', cooldown_ms=80)
+        self.play_sfx('explosion_big', cooldown_ms=1)
 
         expl = Explosion(barrel.rect.centerx, barrel.rect.centery)
         self.all_sprites.add(expl)
@@ -943,7 +943,7 @@ class Game:
             
             if boss_enemy.hp <= 0:
                 self.play_sfx('boss_death_explosion', cooldown_ms=250)
-                self.play_sfx('explosion_big', cooldown_ms=250)
+                self.play_sfx('explosion_big', cooldown_ms=100)
                 self.spawn_loot(boss_enemy)
                 self.add_score(boss_enemy.score_val)
                 boss_enemy.kill()                
@@ -999,15 +999,15 @@ class Game:
             self.add_score(100)
             
             if item.type_name == 'heal':
-                self.play_sfx('pickup_health', cooldown_ms=80)
+                self.play_sfx('pickup_health', cooldown_ms=1)
                 self.player.hp = min(self.player.max_hp, self.player.hp + 30)
             elif item.type_name == 'mg':
-                self.play_sfx('pickup_machine_gun', cooldown_ms=80)
+                self.play_sfx('pickup_machine_gun', cooldown_ms=1)
                 self.player.weapon_type = "hmg"
                 self.player.ammo += 100
                 self.hmg_pickup_msg_timer = 60
             elif item.type_name == 'rl':
-                self.play_sfx('pickup_rocket_launcher', cooldown_ms=80)
+                self.play_sfx('pickup_rocket_launcher', cooldown_ms=1)
                 self.player.weapon_type = "rocket"
                 self.player.ammo += 18
                 self.rl_pickup_msg_timer = 60

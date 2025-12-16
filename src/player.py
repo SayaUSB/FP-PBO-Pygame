@@ -239,7 +239,7 @@ class Player(pygame.sprite.Sprite):
     def fire_bullet(self, bullets, all_sprites):
         if self.weapon_type == "rocket":
             if hasattr(self.game_ref, 'play_sfx'):
-                self.game_ref.play_sfx('gunshot_assault_rifle', cooldown_ms=120)
+                self.game_ref.play_sfx('gunshot_assault_rifle', cooldown_ms=1)
             target = None
             best_d = None
             try:
